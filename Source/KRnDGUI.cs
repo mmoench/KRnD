@@ -213,6 +213,27 @@ namespace KRnD
             return 0;
         }
 
+        public static int UpgradeCrashTolerance(Part part)
+        {
+            try
+            {
+                KRnDUpgrade store = null;
+                if (!KRnD.upgrades.TryGetValue(part.name, out store))
+                {
+                    store = new KRnDUpgrade();
+                    KRnD.upgrades.Add(part.name, store);
+                }
+                store.crashTolerance++;
+                KRnD.updateGlobalParts();
+                KRnD.updateEditorVessel();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[KRnD] UpgradeCrashTolerance(): " + e.ToString());
+            }
+            return 0;
+        }
+
         // Returns the info-text of the given part with the given upgrades to be displayed in the GUI-comparison.
         private String getPartInfo(Part part, KRnDUpgrade upgradesToApply=null)
         {
@@ -229,8 +250,14 @@ namespace KRnD
                 ModuleRCS rcsModule = KRnD.getRcsModule(part);
                 ModuleReactionWheel reactionWheelModule = KRnD.getReactionWheelModule(part);
                 ModuleDeployableSolarPanel solarPanelModule = KRnD.getSolarPanelModule(part);
+                ModuleLandingLeg landingLegModule = KRnD.getLandingLegModule(part);
 
-                info = "<color=#FFFFFF><b>Dry Mass:</b> "+ part.mass.ToString("0.#### t") +"\n\n";
+                // Basic stats:
+                info = "<color=#FFFFFF><b>Dry Mass:</b> "+ part.mass.ToString("0.#### t") +"\n";
+                if (landingLegModule) info += "<b>Crash Tolerance:</b> " + part.crashTolerance.ToString("0.#### m/s") + "\n";
+
+                // Module stats:
+                info += "\n";
                 if (enginesModule) info += "<color=#99FF00><b>Engine:</b></color>\n" + enginesModule.GetInfo();
                 if (rcsModule) info += "<color=#99FF00><b>RCS:</b></color>\n" + rcsModule.GetInfo();
                 if (reactionWheelModule) info += "<color=#99FF00><b>Reaction Wheel:</b></color>\n" + reactionWheelModule.GetInfo();
@@ -299,6 +326,7 @@ namespace KRnD
                 ModuleRCS rcsModule = null;
                 ModuleReactionWheel reactionWheelModule = null;
                 ModuleDeployableSolarPanel solarPanelModule = null;
+                ModuleLandingLeg landingLegModule = null;
                 if (selectedPart != null)
                 {
                     foreach (AvailablePart aPart in PartLoader.Instance.parts)
@@ -317,6 +345,7 @@ namespace KRnD
                         rcsModule = KRnD.getRcsModule(part);
                         reactionWheelModule = KRnD.getReactionWheelModule(part);
                         solarPanelModule = KRnD.getSolarPanelModule(part);
+                        landingLegModule = KRnD.getLandingLegModule(part);
                     }
                 }
                 if (!part || !rndModule)
@@ -364,6 +393,10 @@ namespace KRnD
                 if (solarPanelModule)
                 {
                     options.Add("Charge Rate");
+                }
+                if (landingLegModule)
+                {
+                    options.Add("Crash Tolerance");
                 }
                 if (this.selectedUpgradeOption >= options.Count) this.selectedUpgradeOption = 0;
                 this.selectedUpgradeOption = GUILayout.SelectionGrid(this.selectedUpgradeOption, options.ToArray(), 1, this.buttonStyle);
@@ -437,6 +470,15 @@ namespace KRnD
                     currentImprovement = KRnD.calculateImprovementFactor(rndModule.chargeRate_improvement, rndModule.chargeRate_improvementScale, currentUpgrade.chargeRate);
                     nextImprovement = KRnD.calculateImprovementFactor(rndModule.chargeRate_improvement, rndModule.chargeRate_improvementScale, nextUpgrade.chargeRate);
                     scienceCost = KRnD.calculateScienceCost(rndModule.chargeRate_scienceCost, rndModule.chargeRate_costScale, nextUpgrade.chargeRate);
+                }
+                else if (selectedUpgradeOption == "Crash Tolerance")
+                {
+                    upgradeFunction = KRnDGUI.UpgradeCrashTolerance;
+                    currentUpgradeCount = currentUpgrade.crashTolerance;
+                    nextUpgradeCount = ++nextUpgrade.crashTolerance;
+                    currentImprovement = KRnD.calculateImprovementFactor(rndModule.crashTolerance_improvement, rndModule.crashTolerance_improvementScale, currentUpgrade.crashTolerance);
+                    nextImprovement = KRnD.calculateImprovementFactor(rndModule.crashTolerance_improvement, rndModule.crashTolerance_improvementScale, nextUpgrade.crashTolerance);
+                    scienceCost = KRnD.calculateScienceCost(rndModule.crashTolerance_scienceCost, rndModule.crashTolerance_costScale, nextUpgrade.crashTolerance);
                 }
                 else throw new Exception("unexpected option '" + selectedUpgradeOption + "'");
                 String newInfo = getPartInfo(part, nextUpgrade); // Calculate part-info if the selected stat was upgraded.

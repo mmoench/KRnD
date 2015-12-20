@@ -21,6 +21,7 @@ namespace KRnD
         public int fuelFlow = 0;
         public int torque = 0;
         public int chargeRate = 0;
+        public int crashTolerance = 0;
 
         public const String ISP_VAC = "ispVac";
         public const String ISP_ATM = "ispAtm";
@@ -28,6 +29,7 @@ namespace KRnD
         public const String FUEL_FLOW = "fuelFlow";
         public const String TORQUE = "torque";
         public const String CHARGE_RATE = "chargeRate";
+        public const String CRASH_TOLERANCE = "crashTolerance";
 
         public override string ToString()
         {
@@ -37,7 +39,8 @@ namespace KRnD
                 DRY_MASS+":" + this.dryMass.ToString() + "," +
                 FUEL_FLOW+":" + this.fuelFlow.ToString() + "," +
                 TORQUE+":" + this.torque.ToString() + "," +
-                CHARGE_RATE+":" + this.chargeRate.ToString() +
+                CHARGE_RATE+":" + this.chargeRate.ToString() + "," +
+                CRASH_TOLERANCE+":" + this.crashTolerance.ToString() +
                 ")";
         }
 
@@ -50,6 +53,7 @@ namespace KRnD
             if (this.fuelFlow > 0) node.AddValue(FUEL_FLOW, this.fuelFlow.ToString());
             if (this.torque > 0) node.AddValue(TORQUE, this.torque.ToString());
             if (this.chargeRate > 0) node.AddValue(CHARGE_RATE, this.chargeRate.ToString());
+            if (this.crashTolerance > 0) node.AddValue(CRASH_TOLERANCE, this.crashTolerance.ToString());
             return node;
         }
 
@@ -62,6 +66,7 @@ namespace KRnD
             if (node.HasValue(FUEL_FLOW)) upgrade.fuelFlow = Int32.Parse(node.GetValue(FUEL_FLOW));
             if (node.HasValue(TORQUE)) upgrade.torque = Int32.Parse(node.GetValue(TORQUE));
             if (node.HasValue(CHARGE_RATE)) upgrade.chargeRate = Int32.Parse(node.GetValue(CHARGE_RATE));
+            if (node.HasValue(CRASH_TOLERANCE)) upgrade.crashTolerance = Int32.Parse(node.GetValue(CRASH_TOLERANCE));
             return upgrade;
         }
 
@@ -74,6 +79,7 @@ namespace KRnD
             copy.fuelFlow = this.fuelFlow;
             copy.torque = this.torque;
             copy.chargeRate = this.chargeRate;
+            copy.crashTolerance = this.crashTolerance;
             return copy;
         }
     }
@@ -87,6 +93,7 @@ namespace KRnD
         public FloatCurve atmosphereCurve = null;
         public float torque = 0;
         public float chargeRate = 0;
+        public float crashTolerance = 0;
 
         public PartStats(Part part)
         {
@@ -126,6 +133,12 @@ namespace KRnD
             if (solarPanel)
             {
                 this.chargeRate = solarPanel.chargeRate;
+            }
+
+            ModuleLandingLeg landingLeg = KRnD.getLandingLegModule(part);
+            if (landingLeg)
+            {
+                this.crashTolerance = part.crashTolerance; // Every part has a crash tolerance, but we only want to improve landing legs.
             }
         }
     }
@@ -179,6 +192,15 @@ namespace KRnD
             foreach (PartModule partModule in part.Modules)
             {
                 if (partModule.moduleName == "ModuleDeployableSolarPanel") return (ModuleDeployableSolarPanel)partModule;
+            }
+            return null;
+        }
+
+        public static ModuleLandingLeg getLandingLegModule(Part part)
+        {
+            foreach (PartModule partModule in part.Modules)
+            {
+                if (partModule.moduleName == "ModuleLandingLeg") return (ModuleLandingLeg)partModule;
             }
             return null;
         }
@@ -247,6 +269,11 @@ namespace KRnD
                         {
                             ModuleDeployableSolarPanel solarPanel = KRnD.getSolarPanelModule(part.partPrefab);
                             info.info = solarPanel.GetInfo();
+                        }
+                        else if (info.moduleName.ToLower() == "landing leg")
+                        {
+                            ModuleLandingLeg landingLeg = KRnD.getLandingLegModule(part.partPrefab);
+                            info.info = landingLeg.GetInfo();
                         }
                     }
                     upgradesApplied++;
@@ -319,6 +346,7 @@ namespace KRnD
                 ModuleRCS rcsModule = KRnD.getRcsModule(part);
                 ModuleReactionWheel reactionWheel = KRnD.getReactionWheelModule(part);
                 ModuleDeployableSolarPanel solarPanel = KRnD.getSolarPanelModule(part);
+                ModuleLandingLeg landingLeg = KRnD.getLandingLegModule(part);
                 if (rndModule == null) return;
                 if (KRnD.upgrades == null) throw new Exception("upgrades-dictionary missing");
                 if (KRnD.originalStats == null) throw new Exception("original-stats-dictionary missing");
@@ -411,6 +439,17 @@ namespace KRnD
                     rndModule.chargeRate_upgrades = 0;
                 }
 
+                // Crash Tolerance (only for landing legs):
+                if (landingLeg)
+                {
+                    rndModule.crashTolerance_upgrades = upgradesToApply.crashTolerance;
+                    float crashTolerance = originalStats.crashTolerance * (1 + KRnD.calculateImprovementFactor(rndModule.crashTolerance_improvement, rndModule.crashTolerance_improvementScale, upgradesToApply.crashTolerance));
+                    part.crashTolerance = crashTolerance;
+                }
+                else
+                {
+                    rndModule.crashTolerance_upgrades = 0;
+                }
             }
             catch (Exception e)
             {

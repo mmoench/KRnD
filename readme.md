@@ -20,5 +20,6 @@ At the moment you can improve the following stats::
 + Fuel flow of Engines and RCS-Thrusters (increasing their thrust)
 + Torque of reaction wheels
 + Charge rate of solar panels
++ Crash tolerance of landing legs
 
 If you have any problems with this mod or would like to suggest an improvement, please go to the official [forum thread](http://forum.kerbalspaceprogram.com/) or open a new ticket on [Github](https://github.com/mmoench/KRnD).
