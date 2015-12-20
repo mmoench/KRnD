@@ -20,21 +20,24 @@ namespace KRnD
         public int dryMass = 0;
         public int fuelFlow = 0;
         public int torque = 0;
+        public int chargeRate = 0;
 
         public const String ISP_VAC = "ispVac";
         public const String ISP_ATM = "ispAtm";
         public const String DRY_MASS = "dryMass";
         public const String FUEL_FLOW = "fuelFlow";
         public const String TORQUE = "torque";
+        public const String CHARGE_RATE = "chargeRate";
 
         public override string ToString()
         {
             return "KRnDUpgrade(" +
-                "ispVac:" + this.ispVac.ToString() + "," +
-                "ispAtm:" + this.ispAtm.ToString() + "," +
-                "dryMass:" + this.dryMass.ToString() + "," +
-                "fuelFlow:" + this.fuelFlow.ToString() + "," +
-                "torque:" + this.torque.ToString() +
+                ISP_VAC+":" + this.ispVac.ToString() + "," +
+                ISP_ATM+":" + this.ispAtm.ToString() + "," +
+                DRY_MASS+":" + this.dryMass.ToString() + "," +
+                FUEL_FLOW+":" + this.fuelFlow.ToString() + "," +
+                TORQUE+":" + this.torque.ToString() + "," +
+                CHARGE_RATE+":" + this.chargeRate.ToString() +
                 ")";
         }
 
@@ -46,6 +49,7 @@ namespace KRnD
             if (this.dryMass > 0) node.AddValue(DRY_MASS, this.dryMass.ToString());
             if (this.fuelFlow > 0) node.AddValue(FUEL_FLOW, this.fuelFlow.ToString());
             if (this.torque > 0) node.AddValue(TORQUE, this.torque.ToString());
+            if (this.chargeRate > 0) node.AddValue(CHARGE_RATE, this.chargeRate.ToString());
             return node;
         }
 
@@ -57,6 +61,7 @@ namespace KRnD
             if (node.HasValue(DRY_MASS)) upgrade.dryMass = Int32.Parse(node.GetValue(DRY_MASS));
             if (node.HasValue(FUEL_FLOW)) upgrade.fuelFlow = Int32.Parse(node.GetValue(FUEL_FLOW));
             if (node.HasValue(TORQUE)) upgrade.torque = Int32.Parse(node.GetValue(TORQUE));
+            if (node.HasValue(CHARGE_RATE)) upgrade.chargeRate = Int32.Parse(node.GetValue(CHARGE_RATE));
             return upgrade;
         }
 
@@ -68,6 +73,7 @@ namespace KRnD
             copy.dryMass = this.dryMass;
             copy.fuelFlow = this.fuelFlow;
             copy.torque = this.torque;
+            copy.chargeRate = this.chargeRate;
             return copy;
         }
     }
@@ -80,6 +86,7 @@ namespace KRnD
         public float maxFuelFlow = 0;
         public FloatCurve atmosphereCurve = null;
         public float torque = 0;
+        public float chargeRate = 0;
 
         public PartStats(Part part)
         {
@@ -113,6 +120,12 @@ namespace KRnD
             if (reactionWheel)
             {
                 this.torque = reactionWheel.RollTorque; // There is also pitch- and yaw-torque, but they should all be the same
+            }
+
+            ModuleDeployableSolarPanel solarPanel = KRnD.getSolarPanelModule(part);
+            if (solarPanel)
+            {
+                this.chargeRate = solarPanel.chargeRate;
             }
         }
     }
@@ -157,6 +170,15 @@ namespace KRnD
             foreach (PartModule partModule in part.Modules)
             {
                 if (partModule.moduleName == "ModuleReactionWheel") return (ModuleReactionWheel)partModule;
+            }
+            return null;
+        }
+
+        public static ModuleDeployableSolarPanel getSolarPanelModule(Part part)
+        {
+            foreach (PartModule partModule in part.Modules)
+            {
+                if (partModule.moduleName == "ModuleDeployableSolarPanel") return (ModuleDeployableSolarPanel)partModule;
             }
             return null;
         }
@@ -211,15 +233,20 @@ namespace KRnD
                             info.info = engines.GetInfo();
                             info.primaryInfo = engines.GetPrimaryField();
                         }
-                        if (info.moduleName.ToLower() == "rcs")
+                        else if (info.moduleName.ToLower() == "rcs")
                         {
                             ModuleRCS rcs = KRnD.getRcsModule(part.partPrefab);
                             info.info = rcs.GetInfo();
                         }
-                        if (info.moduleName.ToLower() == "reaction wheel")
+                        else if (info.moduleName.ToLower() == "reaction wheel")
                         {
                             ModuleReactionWheel reactionWheel = KRnD.getReactionWheelModule(part.partPrefab);
                             info.info = reactionWheel.GetInfo();
+                        }
+                        else if (info.moduleName.ToLower() == "deployable solar panel")
+                        {
+                            ModuleDeployableSolarPanel solarPanel = KRnD.getSolarPanelModule(part.partPrefab);
+                            info.info = solarPanel.GetInfo();
                         }
                     }
                     upgradesApplied++;
@@ -291,6 +318,7 @@ namespace KRnD
                 ModuleEngines engineModule = KRnD.getEnginesModule(part);
                 ModuleRCS rcsModule = KRnD.getRcsModule(part);
                 ModuleReactionWheel reactionWheel = KRnD.getReactionWheelModule(part);
+                ModuleDeployableSolarPanel solarPanel = KRnD.getSolarPanelModule(part);
                 if (rndModule == null) return;
                 if (KRnD.upgrades == null) throw new Exception("upgrades-dictionary missing");
                 if (KRnD.originalStats == null) throw new Exception("original-stats-dictionary missing");
@@ -369,6 +397,18 @@ namespace KRnD
                 else
                 {
                     rndModule.torque_upgrades = 0;
+                }
+
+                // Charge Rate:
+                if (solarPanel)
+                {
+                    rndModule.chargeRate_upgrades = upgradesToApply.chargeRate;
+                    float chargeRate = originalStats.chargeRate * (1 + KRnD.calculateImprovementFactor(rndModule.chargeRate_improvement, rndModule.chargeRate_improvementScale, upgradesToApply.chargeRate));
+                    solarPanel.chargeRate = chargeRate;
+                }
+                else
+                {
+                    rndModule.chargeRate_upgrades = 0;
                 }
 
             }

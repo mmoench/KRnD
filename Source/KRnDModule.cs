@@ -77,6 +77,18 @@ namespace KRnD
         [KSPField(isPersistant = false)]
         public float torque_improvementScale = 1f;
 
+        // Charge Rate
+        [KSPField(isPersistant = true)]
+        public int chargeRate_upgrades = 0;
+        [KSPField(isPersistant = false)]
+        public int chargeRate_scienceCost = 10;
+        [KSPField(isPersistant = false)]
+        public float chargeRate_costScale = 2f;
+        [KSPField(isPersistant = false)]
+        public float chargeRate_improvement = 0.05f;
+        [KSPField(isPersistant = false)]
+        public float chargeRate_improvementScale = 1f;
+
         public static String ToRoman(int number)
         {
             if (number == 0) return "";
@@ -98,7 +110,7 @@ namespace KRnD
 
         public String getVersion()
         {
-            int upgrades = this.dryMass_upgrades + this.fuelFlow_upgrades + this.ispVac_upgrades + this.ispAtm_upgrades + this.torque_upgrades;
+            int upgrades = this.dryMass_upgrades + this.fuelFlow_upgrades + this.ispVac_upgrades + this.ispAtm_upgrades + this.torque_upgrades + this.chargeRate_upgrades;
             if (upgrades == 0) return "";
             return "Mk " + ToRoman(upgrades + 1); // Mk I is the part without upgrades, Mk II the first upgraded version.
         }
@@ -125,6 +137,7 @@ namespace KRnD
             upgrades.ispVac = this.ispVac_upgrades;
             upgrades.ispAtm = this.ispAtm_upgrades;
             upgrades.torque = this.torque_upgrades;
+            upgrades.chargeRate = this.chargeRate_upgrades;
             return upgrades;
         }
     }
