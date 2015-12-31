@@ -22,6 +22,9 @@ namespace KRnD
         public int torque = 0;
         public int chargeRate = 0;
         public int crashTolerance = 0;
+        public int batteryCharge = 0;
+        public int generatorEfficiency = 0;
+        public int converterEfficiency = 0;
 
         public const String ISP_VAC = "ispVac";
         public const String ISP_ATM = "ispAtm";
@@ -30,6 +33,9 @@ namespace KRnD
         public const String TORQUE = "torque";
         public const String CHARGE_RATE = "chargeRate";
         public const String CRASH_TOLERANCE = "crashTolerance";
+        public const String BATTERY_CHARGE = "batteryCharge";
+        public const String GENERATOR_EFFICIENCY = "generatorEfficiency";
+        public const String CONVERTER_EFFICIENCY = "converterEfficiency";
 
         public override string ToString()
         {
@@ -40,7 +46,10 @@ namespace KRnD
                 FUEL_FLOW+":" + this.fuelFlow.ToString() + "," +
                 TORQUE+":" + this.torque.ToString() + "," +
                 CHARGE_RATE+":" + this.chargeRate.ToString() + "," +
-                CRASH_TOLERANCE+":" + this.crashTolerance.ToString() +
+                CRASH_TOLERANCE+":" + this.crashTolerance.ToString() + "," +
+                BATTERY_CHARGE+":" + this.batteryCharge.ToString() + "," +
+                GENERATOR_EFFICIENCY + ":" + this.generatorEfficiency.ToString() + "," +
+                CONVERTER_EFFICIENCY + ":" + this.converterEfficiency.ToString() +
                 ")";
         }
 
@@ -54,6 +63,9 @@ namespace KRnD
             if (this.torque > 0) node.AddValue(TORQUE, this.torque.ToString());
             if (this.chargeRate > 0) node.AddValue(CHARGE_RATE, this.chargeRate.ToString());
             if (this.crashTolerance > 0) node.AddValue(CRASH_TOLERANCE, this.crashTolerance.ToString());
+            if (this.batteryCharge > 0) node.AddValue(BATTERY_CHARGE, this.batteryCharge.ToString());
+            if (this.generatorEfficiency > 0) node.AddValue(GENERATOR_EFFICIENCY, this.generatorEfficiency.ToString());
+            if (this.converterEfficiency > 0) node.AddValue(CONVERTER_EFFICIENCY, this.converterEfficiency.ToString());
             return node;
         }
 
@@ -67,6 +79,9 @@ namespace KRnD
             if (node.HasValue(TORQUE)) upgrade.torque = Int32.Parse(node.GetValue(TORQUE));
             if (node.HasValue(CHARGE_RATE)) upgrade.chargeRate = Int32.Parse(node.GetValue(CHARGE_RATE));
             if (node.HasValue(CRASH_TOLERANCE)) upgrade.crashTolerance = Int32.Parse(node.GetValue(CRASH_TOLERANCE));
+            if (node.HasValue(BATTERY_CHARGE)) upgrade.batteryCharge = Int32.Parse(node.GetValue(BATTERY_CHARGE));
+            if (node.HasValue(GENERATOR_EFFICIENCY)) upgrade.generatorEfficiency = Int32.Parse(node.GetValue(GENERATOR_EFFICIENCY));
+            if (node.HasValue(CONVERTER_EFFICIENCY)) upgrade.converterEfficiency = Int32.Parse(node.GetValue(CONVERTER_EFFICIENCY));
             return upgrade;
         }
 
@@ -80,6 +95,9 @@ namespace KRnD
             copy.torque = this.torque;
             copy.chargeRate = this.chargeRate;
             copy.crashTolerance = this.crashTolerance;
+            copy.batteryCharge = this.batteryCharge;
+            copy.generatorEfficiency = this.generatorEfficiency;
+            copy.converterEfficiency = this.converterEfficiency;
             return copy;
         }
     }
@@ -94,6 +112,9 @@ namespace KRnD
         public float torque = 0;
         public float chargeRate = 0;
         public float crashTolerance = 0;
+        public double batteryCharge = 0;
+        public Dictionary<String, double> generatorEfficiency = null; // Resource-Name, Rate
+        public Dictionary<String, Dictionary<String, double>> converterEfficiency = null; // Converter Name, (Resource-Name, Ratio)
 
         public PartStats(Part part)
         {
@@ -139,6 +160,38 @@ namespace KRnD
             if (landingLeg)
             {
                 this.crashTolerance = part.crashTolerance; // Every part has a crash tolerance, but we only want to improve landing legs.
+            }
+
+            PartResource electricCharge = KRnD.getChargeResource(part);
+            if (electricCharge)
+            {
+                this.batteryCharge = electricCharge.maxAmount;
+            }
+
+            ModuleGenerator generator = KRnD.getGeneratorModule(part);
+            if (generator)
+            {
+                generatorEfficiency = new Dictionary<String, double>();
+                foreach (ModuleGenerator.GeneratorResource outputResource in generator.outputList)
+                {
+                    generatorEfficiency.Add(outputResource.name, outputResource.rate);
+                }
+            }
+
+            // There might be different converter-modules in the same part with different names (eg for Fuel, Monopropellant, etc):
+            List<ModuleResourceConverter> converterList = KRnD.getConverterModules(part);
+            if (converterList != null)
+            {
+                converterEfficiency = new Dictionary<String, Dictionary<String, double>>();
+                foreach (ModuleResourceConverter converter in converterList)
+                {
+                    Dictionary<String, double> thisConverterEfficiency = new Dictionary<String, double>();
+                    foreach (ResourceRatio resourceRatio in converter.outputList)
+                    {
+                        thisConverterEfficiency.Add(resourceRatio.ResourceName, resourceRatio.Ratio);
+                    }
+                    converterEfficiency.Add(converter.ConverterName, thisConverterEfficiency);
+                }
             }
         }
     }
@@ -205,6 +258,35 @@ namespace KRnD
             return null;
         }
 
+        public static PartResource getChargeResource(Part part)
+        {
+            foreach (PartResource partResource in part.Resources)
+            {
+                if (partResource.resourceName == "ElectricCharge") return partResource;
+            }
+            return null;
+        }
+
+        public static ModuleGenerator getGeneratorModule(Part part)
+        {
+            foreach (PartModule partModule in part.Modules)
+            {
+                if (partModule.moduleName == "ModuleGenerator") return (ModuleGenerator)partModule;
+            }
+            return null;
+        }
+
+        public static List<ModuleResourceConverter> getConverterModules(Part part)
+        {
+            List<ModuleResourceConverter> converters = new List<ModuleResourceConverter>();
+            foreach (PartModule partModule in part.Modules)
+            {
+                if (partModule.moduleName == "ModuleResourceConverter") converters.Add((ModuleResourceConverter)partModule);
+            }
+            if (converters.Count == 0) return null;
+            return converters;
+        }
+
         public static float calculateImprovementFactor(float baseImprovement, float improvementScale, int upgrades)
         {
             float factor = 0;
@@ -247,6 +329,7 @@ namespace KRnD
                     KRnD.updatePart(part.partPrefab, true);
 
                     // Rebuild the info-screen:
+                    int converterModuleNumber = 0; // There might be multiple modules of this type
                     foreach (AvailablePart.ModuleInfo info in part.moduleInfos)
                     {
                         if (info.moduleName.ToLower() == "engine")
@@ -274,6 +357,26 @@ namespace KRnD
                         {
                             ModuleLandingLeg landingLeg = KRnD.getLandingLegModule(part.partPrefab);
                             info.info = landingLeg.GetInfo();
+                        }
+                        else if (info.moduleName.ToLower() == "generator")
+                        {
+                            ModuleGenerator generator = KRnD.getGeneratorModule(part.partPrefab);
+                            info.info = generator.GetInfo();
+                        }
+                        else if (info.moduleName.ToLower() == "resource converter")
+                        {
+                            List<ModuleResourceConverter> converterList = KRnD.getConverterModules(part.partPrefab);
+                            ModuleResourceConverter converter = converterList[converterModuleNumber];
+                            info.info = converter.GetInfo();
+                            converterModuleNumber++;
+                        }
+                    }
+                    foreach (AvailablePart.ResourceInfo info in part.resourceInfos)
+                    {
+                        if (info.resourceName.ToLower() == "electric charge")
+                        {
+                            PartResource electricCharge = KRnD.getChargeResource(part.partPrefab);
+                            info.info = electricCharge.GetInfo();
                         }
                     }
                     upgradesApplied++;
@@ -342,11 +445,6 @@ namespace KRnD
             {
                 // Find all relevant modules of this part:
                 KRnDModule rndModule = KRnD.getKRnDModule(part);
-                ModuleEngines engineModule = KRnD.getEnginesModule(part);
-                ModuleRCS rcsModule = KRnD.getRcsModule(part);
-                ModuleReactionWheel reactionWheel = KRnD.getReactionWheelModule(part);
-                ModuleDeployableSolarPanel solarPanel = KRnD.getSolarPanelModule(part);
-                ModuleLandingLeg landingLeg = KRnD.getLandingLegModule(part);
                 if (rndModule == null) return;
                 if (KRnD.upgrades == null) throw new Exception("upgrades-dictionary missing");
                 if (KRnD.originalStats == null) throw new Exception("original-stats-dictionary missing");
@@ -368,6 +466,8 @@ namespace KRnD
                 part.mass = originalStats.mass * ( 1 + KRnD.calculateImprovementFactor(rndModule.dryMass_improvement, rndModule.dryMass_improvementScale, upgradesToApply.dryMass) );
                 
                 // Fuel Flow:
+                ModuleEngines engineModule = KRnD.getEnginesModule(part);
+                ModuleRCS rcsModule = KRnD.getRcsModule(part);
                 if (engineModule || rcsModule)
                 {
                     rndModule.fuelFlow_upgrades = upgradesToApply.fuelFlow;
@@ -414,6 +514,7 @@ namespace KRnD
                 }
 
                 // Torque:
+                ModuleReactionWheel reactionWheel = KRnD.getReactionWheelModule(part);
                 if (reactionWheel)
                 {
                     rndModule.torque_upgrades = upgradesToApply.torque;
@@ -428,6 +529,7 @@ namespace KRnD
                 }
 
                 // Charge Rate:
+                ModuleDeployableSolarPanel solarPanel = KRnD.getSolarPanelModule(part);
                 if (solarPanel)
                 {
                     rndModule.chargeRate_upgrades = upgradesToApply.chargeRate;
@@ -440,6 +542,7 @@ namespace KRnD
                 }
 
                 // Crash Tolerance (only for landing legs):
+                ModuleLandingLeg landingLeg = KRnD.getLandingLegModule(part);
                 if (landingLeg)
                 {
                     rndModule.crashTolerance_upgrades = upgradesToApply.crashTolerance;
@@ -450,6 +553,66 @@ namespace KRnD
                 {
                     rndModule.crashTolerance_upgrades = 0;
                 }
+
+                // Battery Charge:
+                PartResource electricCharge = KRnD.getChargeResource(part);
+                if (electricCharge)
+                {
+                    rndModule.batteryCharge_upgrades = upgradesToApply.batteryCharge;
+                    double batteryCharge = originalStats.batteryCharge * (1 + KRnD.calculateImprovementFactor(rndModule.batteryCharge_improvement, rndModule.batteryCharge_improvementScale, upgradesToApply.batteryCharge));
+                    batteryCharge = Math.Round(batteryCharge); // We don't want half units of electric charge
+
+                    bool batteryIsFull = false;
+                    if (electricCharge.amount == electricCharge.maxAmount) batteryIsFull = true;
+
+                    electricCharge.maxAmount = batteryCharge;
+                    if (batteryIsFull) electricCharge.amount = electricCharge.maxAmount;
+                }
+                else
+                {
+                    rndModule.batteryCharge_upgrades = 0;
+                }
+
+                // Generator Efficiency:
+                ModuleGenerator generator = KRnD.getGeneratorModule(part);
+                if (generator)
+                {
+                    rndModule.generatorEfficiency_upgrades = upgradesToApply.generatorEfficiency;
+                    foreach (ModuleGenerator.GeneratorResource outputResource in generator.outputList)
+                    {
+                        double originalRate;
+                        if (!originalStats.generatorEfficiency.TryGetValue(outputResource.name, out originalRate)) continue;
+                        outputResource.rate = (float) (originalRate * (1 + KRnD.calculateImprovementFactor(rndModule.generatorEfficiency_improvement, rndModule.generatorEfficiency_improvementScale, upgradesToApply.generatorEfficiency)));
+                    }
+                }
+                else
+                {
+                    rndModule.generatorEfficiency_upgrades = 0;
+                }
+
+                // Converter Efficiency:
+                List<ModuleResourceConverter> converterList = KRnD.getConverterModules(part);
+                if (converterList != null)
+                {
+                    foreach (ModuleResourceConverter converter in converterList)
+                    {
+                        Dictionary<String, double> origiginalOutputResources;
+                        if (!originalStats.converterEfficiency.TryGetValue(converter.ConverterName, out origiginalOutputResources)) continue;
+
+                        rndModule.converterEfficiency_upgrades = upgradesToApply.converterEfficiency;
+                        foreach (ResourceRatio resourceRatio in converter.outputList)
+                        {
+                            double originalRatio;
+                            if (!origiginalOutputResources.TryGetValue(resourceRatio.ResourceName, out originalRatio)) continue;
+                            resourceRatio.Ratio = (float)(originalRatio * (1 + KRnD.calculateImprovementFactor(rndModule.converterEfficiency_improvement, rndModule.converterEfficiency_improvementScale, upgradesToApply.converterEfficiency)));
+                        }
+                    }
+                }
+                else
+                {
+                    rndModule.converterEfficiency_upgrades = 0;
+                }
+
             }
             catch (Exception e)
             {
@@ -625,7 +788,6 @@ namespace KRnD
                     {
                         KRnDUpgrade upgrade = KRnDUpgrade.createFromConfigNode(upgradeNode);
                         KRnD.upgrades.Add(upgradeNode.name, upgrade);
-                        Debug.Log("[KRnD] loaded: " + upgradeNode.name + " " + upgrade.ToString());
                     }
 
                     // Update global part-list with new upgrades from the savegame:

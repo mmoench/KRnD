@@ -234,6 +234,69 @@ namespace KRnD
             return 0;
         }
 
+        public static int UpgradeBatteryCharge(Part part)
+        {
+            try
+            {
+                KRnDUpgrade store = null;
+                if (!KRnD.upgrades.TryGetValue(part.name, out store))
+                {
+                    store = new KRnDUpgrade();
+                    KRnD.upgrades.Add(part.name, store);
+                }
+                store.batteryCharge++;
+                KRnD.updateGlobalParts();
+                KRnD.updateEditorVessel();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[KRnD] UpgradeBatteryCharge(): " + e.ToString());
+            }
+            return 0;
+        }
+
+        public static int UpgradeGeneratorEfficiency(Part part)
+        {
+            try
+            {
+                KRnDUpgrade store = null;
+                if (!KRnD.upgrades.TryGetValue(part.name, out store))
+                {
+                    store = new KRnDUpgrade();
+                    KRnD.upgrades.Add(part.name, store);
+                }
+                store.generatorEfficiency++;
+                KRnD.updateGlobalParts();
+                KRnD.updateEditorVessel();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[KRnD] UpgradeGeneratorEfficiency(): " + e.ToString());
+            }
+            return 0;
+        }
+
+        public static int UpgradeConverterEfficiency(Part part)
+        {
+            try
+            {
+                KRnDUpgrade store = null;
+                if (!KRnD.upgrades.TryGetValue(part.name, out store))
+                {
+                    store = new KRnDUpgrade();
+                    KRnD.upgrades.Add(part.name, store);
+                }
+                store.converterEfficiency++;
+                KRnD.updateGlobalParts();
+                KRnD.updateEditorVessel();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[KRnD] UpgradeConverterEfficiency(): " + e.ToString());
+            }
+            return 0;
+        }
+
         // Returns the info-text of the given part with the given upgrades to be displayed in the GUI-comparison.
         private String getPartInfo(Part part, KRnDUpgrade upgradesToApply=null)
         {
@@ -251,10 +314,14 @@ namespace KRnD
                 ModuleReactionWheel reactionWheelModule = KRnD.getReactionWheelModule(part);
                 ModuleDeployableSolarPanel solarPanelModule = KRnD.getSolarPanelModule(part);
                 ModuleLandingLeg landingLegModule = KRnD.getLandingLegModule(part);
+                PartResource electricChargeResource = KRnD.getChargeResource(part);
+                ModuleGenerator generatorModule = KRnD.getGeneratorModule(part);
+                List<ModuleResourceConverter> converterModules = KRnD.getConverterModules(part);
 
                 // Basic stats:
                 info = "<color=#FFFFFF><b>Dry Mass:</b> "+ part.mass.ToString("0.#### t") +"\n";
                 if (landingLegModule) info += "<b>Crash Tolerance:</b> " + part.crashTolerance.ToString("0.#### m/s") + "\n";
+                if (electricChargeResource) info += "<b>Electric Charge:</b> " + electricChargeResource.maxAmount.ToString() + "\n";
 
                 // Module stats:
                 info += "\n";
@@ -262,6 +329,14 @@ namespace KRnD
                 if (rcsModule) info += "<color=#99FF00><b>RCS:</b></color>\n" + rcsModule.GetInfo();
                 if (reactionWheelModule) info += "<color=#99FF00><b>Reaction Wheel:</b></color>\n" + reactionWheelModule.GetInfo();
                 if (solarPanelModule) info += "<color=#99FF00><b>Solar Panel:</b></color>\n" + solarPanelModule.GetInfo();
+                if (generatorModule) info += "<color=#99FF00><b>Generator:</b></color>\n" + generatorModule.GetInfo();
+                if (converterModules != null)
+                {
+                    foreach (ModuleResourceConverter converterModule in converterModules)
+                    {
+                        info += "<color=#99FF00><b>Converter " + converterModule.ConverterName + ":</b></color>\n" + converterModule.GetInfo() + "\n";
+                    }
+                }
                 info += "</color>";
             }
             catch (Exception e)
@@ -327,6 +402,9 @@ namespace KRnD
                 ModuleReactionWheel reactionWheelModule = null;
                 ModuleDeployableSolarPanel solarPanelModule = null;
                 ModuleLandingLeg landingLegModule = null;
+                PartResource electricChargeResource = null;
+                ModuleGenerator generatorModule = null;
+                List<ModuleResourceConverter> converterModules = null;
                 if (selectedPart != null)
                 {
                     foreach (AvailablePart aPart in PartLoader.Instance.parts)
@@ -346,6 +424,9 @@ namespace KRnD
                         reactionWheelModule = KRnD.getReactionWheelModule(part);
                         solarPanelModule = KRnD.getSolarPanelModule(part);
                         landingLegModule = KRnD.getLandingLegModule(part);
+                        electricChargeResource = KRnD.getChargeResource(part);
+                        generatorModule = KRnD.getGeneratorModule(part);
+                        converterModules = KRnD.getConverterModules(part);
                     }
                 }
                 if (!part || !rndModule)
@@ -397,6 +478,18 @@ namespace KRnD
                 if (landingLegModule)
                 {
                     options.Add("Crash Tolerance");
+                }
+                if (electricChargeResource)
+                {
+                    options.Add("Battery");
+                }
+                if (generatorModule)
+                {
+                    options.Add("Generator");
+                }
+                if (converterModules != null)
+                {
+                    options.Add("Converter");
                 }
                 if (this.selectedUpgradeOption >= options.Count) this.selectedUpgradeOption = 0;
                 this.selectedUpgradeOption = GUILayout.SelectionGrid(this.selectedUpgradeOption, options.ToArray(), 1, this.buttonStyle);
@@ -479,6 +572,41 @@ namespace KRnD
                     currentImprovement = KRnD.calculateImprovementFactor(rndModule.crashTolerance_improvement, rndModule.crashTolerance_improvementScale, currentUpgrade.crashTolerance);
                     nextImprovement = KRnD.calculateImprovementFactor(rndModule.crashTolerance_improvement, rndModule.crashTolerance_improvementScale, nextUpgrade.crashTolerance);
                     scienceCost = KRnD.calculateScienceCost(rndModule.crashTolerance_scienceCost, rndModule.crashTolerance_costScale, nextUpgrade.crashTolerance);
+                }
+                else if (selectedUpgradeOption == "Battery")
+                {
+                    upgradeFunction = KRnDGUI.UpgradeBatteryCharge;
+                    currentUpgradeCount = currentUpgrade.batteryCharge;
+                    nextUpgradeCount = ++nextUpgrade.batteryCharge;
+                    currentImprovement = KRnD.calculateImprovementFactor(rndModule.batteryCharge_improvement, rndModule.batteryCharge_improvementScale, currentUpgrade.batteryCharge);
+                    nextImprovement = KRnD.calculateImprovementFactor(rndModule.batteryCharge_improvement, rndModule.batteryCharge_improvementScale, nextUpgrade.batteryCharge);
+
+                    // Scale science cost with original battery charge:
+                    PartStats originalStats;
+                    if (!KRnD.originalStats.TryGetValue(part.name, out originalStats)) throw new Exception("no origional-stats for part '" + part.name + "'");
+                    double scaleReferenceFactor = 1;
+                    if (rndModule.batteryCharge_costScaleReference > 0) scaleReferenceFactor = originalStats.batteryCharge / rndModule.batteryCharge_costScaleReference;
+                    int scaledCost = (int)Math.Round(rndModule.batteryCharge_scienceCost * scaleReferenceFactor);
+                    if (scaledCost < 1) scaledCost = 1;
+                    scienceCost = KRnD.calculateScienceCost(scaledCost, rndModule.batteryCharge_costScale, nextUpgrade.batteryCharge);
+                }
+                else if (selectedUpgradeOption == "Generator")
+                {
+                    upgradeFunction = KRnDGUI.UpgradeGeneratorEfficiency;
+                    currentUpgradeCount = currentUpgrade.generatorEfficiency;
+                    nextUpgradeCount = ++nextUpgrade.generatorEfficiency;
+                    currentImprovement = KRnD.calculateImprovementFactor(rndModule.generatorEfficiency_improvement, rndModule.generatorEfficiency_improvementScale, currentUpgrade.generatorEfficiency);
+                    nextImprovement = KRnD.calculateImprovementFactor(rndModule.generatorEfficiency_improvement, rndModule.generatorEfficiency_improvementScale, nextUpgrade.generatorEfficiency);
+                    scienceCost = KRnD.calculateScienceCost(rndModule.generatorEfficiency_scienceCost, rndModule.generatorEfficiency_costScale, nextUpgrade.generatorEfficiency);
+                }
+                else if (selectedUpgradeOption == "Converter")
+                {
+                    upgradeFunction = KRnDGUI.UpgradeConverterEfficiency;
+                    currentUpgradeCount = currentUpgrade.converterEfficiency;
+                    nextUpgradeCount = ++nextUpgrade.converterEfficiency;
+                    currentImprovement = KRnD.calculateImprovementFactor(rndModule.converterEfficiency_improvement, rndModule.converterEfficiency_improvementScale, currentUpgrade.converterEfficiency);
+                    nextImprovement = KRnD.calculateImprovementFactor(rndModule.converterEfficiency_improvement, rndModule.converterEfficiency_improvementScale, nextUpgrade.converterEfficiency);
+                    scienceCost = KRnD.calculateScienceCost(rndModule.converterEfficiency_scienceCost, rndModule.converterEfficiency_costScale, nextUpgrade.converterEfficiency);
                 }
                 else throw new Exception("unexpected option '" + selectedUpgradeOption + "'");
                 String newInfo = getPartInfo(part, nextUpgrade); // Calculate part-info if the selected stat was upgraded.

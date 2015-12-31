@@ -21,5 +21,8 @@ At the moment you can improve the following stats::
 + Torque of reaction wheels
 + Charge rate of solar panels
 + Crash tolerance of landing legs
++ Battery capacity
++ Efficiency of Generators (eg RTGs)
++ Efficiency of Resource Converters
 
 If you have any problems with this mod or would like to suggest an improvement, please go to the official [forum thread](http://forum.kerbalspaceprogram.com/) or open a new ticket on [Github](https://github.com/mmoench/KRnD).

@@ -101,6 +101,44 @@ namespace KRnD
         [KSPField(isPersistant = false)]
         public float crashTolerance_improvementScale = 1f;
 
+        // Battery Charge
+        [KSPField(isPersistant = true)]
+        public int batteryCharge_upgrades = 0;
+        [KSPField(isPersistant = false)]
+        public int batteryCharge_scienceCost = 10;
+        [KSPField(isPersistant = false)]
+        public float batteryCharge_costScaleReference = 500f;
+        [KSPField(isPersistant = false)]
+        public float batteryCharge_costScale = 2f;
+        [KSPField(isPersistant = false)]
+        public float batteryCharge_improvement = 0.2f;
+        [KSPField(isPersistant = false)]
+        public float batteryCharge_improvementScale = 1f;
+
+        // Generator Efficiency
+        [KSPField(isPersistant = true)]
+        public int generatorEfficiency_upgrades = 0;
+        [KSPField(isPersistant = false)]
+        public int generatorEfficiency_scienceCost = 15;
+        [KSPField(isPersistant = false)]
+        public float generatorEfficiency_costScale = 2f;
+        [KSPField(isPersistant = false)]
+        public float generatorEfficiency_improvement = 0.1f;
+        [KSPField(isPersistant = false)]
+        public float generatorEfficiency_improvementScale = 1f;
+
+        // Converter Efficiency
+        [KSPField(isPersistant = true)]
+        public int converterEfficiency_upgrades = 0;
+        [KSPField(isPersistant = false)]
+        public int converterEfficiency_scienceCost = 15;
+        [KSPField(isPersistant = false)]
+        public float converterEfficiency_costScale = 2f;
+        [KSPField(isPersistant = false)]
+        public float converterEfficiency_improvement = 0.1f;
+        [KSPField(isPersistant = false)]
+        public float converterEfficiency_improvementScale = 1f;
+
         public static String ToRoman(int number)
         {
             if (number == 0) return "";
@@ -122,7 +160,7 @@ namespace KRnD
 
         public String getVersion()
         {
-            int upgrades = this.dryMass_upgrades + this.fuelFlow_upgrades + this.ispVac_upgrades + this.ispAtm_upgrades + this.torque_upgrades + this.chargeRate_upgrades + this.crashTolerance_upgrades;
+            int upgrades = this.dryMass_upgrades + this.fuelFlow_upgrades + this.ispVac_upgrades + this.ispAtm_upgrades + this.torque_upgrades + this.chargeRate_upgrades + this.crashTolerance_upgrades + this.batteryCharge_upgrades + this.generatorEfficiency_upgrades + this.converterEfficiency_upgrades;
             if (upgrades == 0) return "";
             return "Mk " + ToRoman(upgrades + 1); // Mk I is the part without upgrades, Mk II the first upgraded version.
         }
@@ -151,6 +189,9 @@ namespace KRnD
             upgrades.torque = this.torque_upgrades;
             upgrades.chargeRate = this.chargeRate_upgrades;
             upgrades.crashTolerance = this.crashTolerance_upgrades;
+            upgrades.batteryCharge = this.batteryCharge_upgrades;
+            upgrades.generatorEfficiency = this.generatorEfficiency_upgrades;
+            upgrades.converterEfficiency = this.converterEfficiency_upgrades;
             return upgrades;
         }
     }
