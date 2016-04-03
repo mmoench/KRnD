@@ -6,23 +6,24 @@ using System.Linq;
 using System.Reflection;
 using System.Text;
 using UnityEngine;
-
 using System.Text.RegularExpressions;
+using KSP.UI.Screens; // For "ApplicationLauncherButton"
 
 namespace KRnD
 {
-    [KSPAddon(KSPAddon.Startup.EveryScene, true)]
-    public class KRnDGUI : MonoBehaviour
+    [KSPAddon(KSPAddon.Startup.EditorAny, false)]
+    public class KRnDGUI : UnityEngine.MonoBehaviour
     {
-        private ApplicationLauncherButton button = null;
+        private static ApplicationLauncherButton button = null;
         public static Rect windowPosition = new Rect(300, 60, 450, 400);
-        private GUIStyle windowStyle = new GUIStyle(HighLogic.Skin.window) { fixedWidth = 500f, fixedHeight = 300f };
-        private GUIStyle labelStyle = new GUIStyle(HighLogic.Skin.label);
-        private GUIStyle labelStyleSmall = new GUIStyle(HighLogic.Skin.label) { fontSize = 12 };
-        private GUIStyle buttonStyle = new GUIStyle(HighLogic.Skin.button);
-        private GUIStyle scrollStyle = new GUIStyle(HighLogic.Skin.scrollView);
-        private Vector2 scrollPos = Vector2.zero;
+        private static GUIStyle windowStyle = new GUIStyle(HighLogic.Skin.window) { fixedWidth = 500f, fixedHeight = 300f };
+        private static GUIStyle labelStyle = new GUIStyle(HighLogic.Skin.label);
+        private static GUIStyle labelStyleSmall = new GUIStyle(HighLogic.Skin.label) { fontSize = 10 };
+        private static GUIStyle buttonStyle = new GUIStyle(HighLogic.Skin.button);
+        private static GUIStyle scrollStyle = new GUIStyle(HighLogic.Skin.scrollView);
+        private static Vector2 scrollPos = Vector2.zero;
         private static Texture2D texture = null;
+        private static bool showGui = false;
 
         // The part that was last selected in the editor:
         public static Part selectedPart = null;
@@ -60,31 +61,27 @@ namespace KRnD
         {
             if (button == null) return;
             ApplicationLauncher.Instance.RemoveModApplication(button);
-            RenderingManager.RemoveFromPostDrawQueue(144, Ondraw);
             button = null;
             selectedPart = null;
+            showGui = false;
         }
 
         private void GuiOn()
         {
-            // Draw window:
-            RenderingManager.AddToPostDrawQueue(100, Ondraw);
+            showGui = true;
         }
 
         private void GuiOff()
         {
-            // Hide window:
-            RenderingManager.RemoveFromPostDrawQueue(100, Ondraw);
+            showGui = false;
         }
 
-        private void Ondraw()
+        public void OnGUI()
         {
-            windowPosition = GUILayout.Window(100, windowPosition, OnWindow, "", windowStyle);
-        }
-
-        private void OnWindow(int windowId)
-        {
-            GenerateWindow();
+            if (showGui)
+            {
+                windowPosition = GUILayout.Window(100, windowPosition, OnWindow, "", windowStyle);
+            }
         }
 
         public static int UpgradeIspVac(Part part)
@@ -297,6 +294,48 @@ namespace KRnD
             return 0;
         }
 
+        public static int UpgradeParachuteStrength(Part part)
+        {
+            try
+            {
+                KRnDUpgrade store = null;
+                if (!KRnD.upgrades.TryGetValue(part.name, out store))
+                {
+                    store = new KRnDUpgrade();
+                    KRnD.upgrades.Add(part.name, store);
+                }
+                store.parachuteStrength++;
+                KRnD.updateGlobalParts();
+                KRnD.updateEditorVessel();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[KRnD] UpgradeParachuteStrength(): " + e.ToString());
+            }
+            return 0;
+        }
+
+        public static int UpgradeMaxTemperature(Part part)
+        {
+            try
+            {
+                KRnDUpgrade store = null;
+                if (!KRnD.upgrades.TryGetValue(part.name, out store))
+                {
+                    store = new KRnDUpgrade();
+                    KRnD.upgrades.Add(part.name, store);
+                }
+                store.maxTemperature++;
+                KRnD.updateGlobalParts();
+                KRnD.updateEditorVessel();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[KRnD] UpgradeMaxTemperature(): " + e.ToString());
+            }
+            return 0;
+        }
+
         // Returns the info-text of the given part with the given upgrades to be displayed in the GUI-comparison.
         private String getPartInfo(Part part, KRnDUpgrade upgradesToApply=null)
         {
@@ -309,23 +348,34 @@ namespace KRnD
 
                 // Upgrade the part to get the correct info, we revert it back to its previous values in the finally block below:
                 KRnD.updatePart(part, upgradesToApply);
-                ModuleEngines enginesModule = KRnD.getEnginesModule(part);
+                List<ModuleEngines> engineModules = KRnD.getEngineModules(part);
                 ModuleRCS rcsModule = KRnD.getRcsModule(part);
                 ModuleReactionWheel reactionWheelModule = KRnD.getReactionWheelModule(part);
                 ModuleDeployableSolarPanel solarPanelModule = KRnD.getSolarPanelModule(part);
-                ModuleLandingLeg landingLegModule = KRnD.getLandingLegModule(part);
+                ModuleWheelBase landingLegModule = KRnD.getLandingLegModule(part);
                 PartResource electricChargeResource = KRnD.getChargeResource(part);
                 ModuleGenerator generatorModule = KRnD.getGeneratorModule(part);
                 List<ModuleResourceConverter> converterModules = KRnD.getConverterModules(part);
+                ModuleParachute parachuteModule = KRnD.getParachuteModule(part);
 
                 // Basic stats:
                 info = "<color=#FFFFFF><b>Dry Mass:</b> "+ part.mass.ToString("0.#### t") +"\n";
+                info += "<b>Max Temp.:</b> " + part.maxTemp.ToString("0.#") + "/" + part.skinMaxTemp.ToString("0.#") + " °K\n";
                 if (landingLegModule) info += "<b>Crash Tolerance:</b> " + part.crashTolerance.ToString("0.#### m/s") + "\n";
                 if (electricChargeResource) info += "<b>Electric Charge:</b> " + electricChargeResource.maxAmount.ToString() + "\n";
 
                 // Module stats:
                 info += "\n";
-                if (enginesModule) info += "<color=#99FF00><b>Engine:</b></color>\n" + enginesModule.GetInfo();
+                if (engineModules != null)
+                {
+                    foreach (ModuleEngines engineModule in engineModules)
+                    {
+                        info += "<color=#99FF00><b>Engine";
+                        if (engineModules.Count > 1) info += " ("+engineModule.engineID.ToString()+")";
+                        info += ":</b></color>\n" + engineModule.GetInfo();
+                        if (engineModules.Count > 1) info += "\n";
+                    }
+                }
                 if (rcsModule) info += "<color=#99FF00><b>RCS:</b></color>\n" + rcsModule.GetInfo();
                 if (reactionWheelModule) info += "<color=#99FF00><b>Reaction Wheel:</b></color>\n" + reactionWheelModule.GetInfo();
                 if (solarPanelModule) info += "<color=#99FF00><b>Solar Panel:</b></color>\n" + solarPanelModule.GetInfo();
@@ -337,6 +387,7 @@ namespace KRnD
                         info += "<color=#99FF00><b>Converter " + converterModule.ConverterName + ":</b></color>\n" + converterModule.GetInfo() + "\n";
                     }
                 }
+                if (parachuteModule) info += "<color=#99FF00><b>Parachute:</b></color>\n" + parachuteModule.GetInfo();
                 info += "</color>";
             }
             catch (Exception e)
@@ -387,7 +438,7 @@ namespace KRnD
             return highlightedText;
         }
 
-        private void GenerateWindow()
+        private void OnWindow(int windowId)
         {
             try
             {
@@ -397,14 +448,15 @@ namespace KRnD
                 String partTitle = "";
                 Part part = null;
                 KRnDModule rndModule = null;
-                ModuleEngines enginesModule = null;
+                List<ModuleEngines> engineModules = null;
                 ModuleRCS rcsModule = null;
                 ModuleReactionWheel reactionWheelModule = null;
                 ModuleDeployableSolarPanel solarPanelModule = null;
-                ModuleLandingLeg landingLegModule = null;
+                ModuleWheelBase landingLegModule = null;
                 PartResource electricChargeResource = null;
                 ModuleGenerator generatorModule = null;
                 List<ModuleResourceConverter> converterModules = null;
+                ModuleParachute parachuteModule = null;
                 if (selectedPart != null)
                 {
                     foreach (AvailablePart aPart in PartLoader.Instance.parts)
@@ -419,7 +471,7 @@ namespace KRnD
                     if (part)
                     {
                         rndModule = KRnD.getKRnDModule(part);
-                        enginesModule = KRnD.getEnginesModule(part);
+                        engineModules = KRnD.getEngineModules(part);
                         rcsModule = KRnD.getRcsModule(part);
                         reactionWheelModule = KRnD.getReactionWheelModule(part);
                         solarPanelModule = KRnD.getSolarPanelModule(part);
@@ -427,14 +479,26 @@ namespace KRnD
                         electricChargeResource = KRnD.getChargeResource(part);
                         generatorModule = KRnD.getGeneratorModule(part);
                         converterModules = KRnD.getConverterModules(part);
+                        parachuteModule = KRnD.getParachuteModule(part);
                     }
                 }
-                if (!part || !rndModule)
+                if (!part)
                 {
                     // No part selected:
                     GUILayout.BeginArea(new Rect(10, 5, windowStyle.fixedWidth, 20));
-                    GUILayout.Label("<b>Kerbal R&D: Select a part to improve</b>", this.labelStyle);
+                    GUILayout.Label("<b>Kerbal R&D: Select a part to improve</b>", labelStyle);
                     GUILayout.EndArea();
+                    GUILayout.EndVertical();
+                    GUI.DragWindow();
+                    return;
+                }
+                else if (!rndModule)
+                {
+                    // Invalid part selected:
+                    GUILayout.BeginArea(new Rect(10, 5, windowStyle.fixedWidth, 20));
+                    GUILayout.Label("<b>Kerbal R&D: Select a different part to improve</b>", labelStyle);
+                    GUILayout.EndArea();
+                    GUILayout.EndVertical();
                     GUI.DragWindow();
                     return;
                 }
@@ -451,17 +515,18 @@ namespace KRnD
                 GUILayout.BeginArea(new Rect(10, 5, windowStyle.fixedWidth, 20));
                 String version = rndModule.getVersion();
                 if (version != "") version = " - " + version;
-                GUILayout.Label("<b>" + partTitle + version + "</b>", this.labelStyle);
+                GUILayout.Label("<b>" + partTitle + version + "</b>", labelStyle);
                 GUILayout.EndArea();
 
                 // List with upgrade-options:
                 float optionsWidth = 100;
-                float optionsHeight = this.windowStyle.fixedHeight - 30 - 30 - 20;
+                float optionsHeight = windowStyle.fixedHeight - 30 - 30 - 20;
                 GUILayout.BeginArea(new Rect(10, 30 + 20, optionsWidth, optionsHeight));
                 
                 List<String> options = new List<String>();
                 options.Add("Dry Mass");
-                if (enginesModule || rcsModule)
+                options.Add("Max Temp");
+                if (engineModules != null || rcsModule)
                 {
                     options.Add("ISP Vac");
                     options.Add("ISP Atm");
@@ -491,8 +556,12 @@ namespace KRnD
                 {
                     options.Add("Converter");
                 }
+                if (parachuteModule)
+                {
+                    options.Add("Parachute");
+                }
                 if (this.selectedUpgradeOption >= options.Count) this.selectedUpgradeOption = 0;
-                this.selectedUpgradeOption = GUILayout.SelectionGrid(this.selectedUpgradeOption, options.ToArray(), 1, this.buttonStyle);
+                this.selectedUpgradeOption = GUILayout.SelectionGrid(this.selectedUpgradeOption, options.ToArray(), 1, buttonStyle);
                 GUILayout.EndArea();
                 
                 String selectedUpgradeOption = options.ToArray()[this.selectedUpgradeOption];
@@ -608,32 +677,50 @@ namespace KRnD
                     nextImprovement = KRnD.calculateImprovementFactor(rndModule.converterEfficiency_improvement, rndModule.converterEfficiency_improvementScale, nextUpgrade.converterEfficiency);
                     scienceCost = KRnD.calculateScienceCost(rndModule.converterEfficiency_scienceCost, rndModule.converterEfficiency_costScale, nextUpgrade.converterEfficiency);
                 }
+                else if (selectedUpgradeOption == "Parachute")
+                {
+                    upgradeFunction = KRnDGUI.UpgradeParachuteStrength;
+                    currentUpgradeCount = currentUpgrade.parachuteStrength;
+                    nextUpgradeCount = ++nextUpgrade.parachuteStrength;
+                    currentImprovement = KRnD.calculateImprovementFactor(rndModule.parachuteStrength_improvement, rndModule.parachuteStrength_improvementScale, currentUpgrade.parachuteStrength);
+                    nextImprovement = KRnD.calculateImprovementFactor(rndModule.parachuteStrength_improvement, rndModule.parachuteStrength_improvementScale, nextUpgrade.parachuteStrength);
+                    scienceCost = KRnD.calculateScienceCost(rndModule.parachuteStrength_scienceCost, rndModule.parachuteStrength_costScale, nextUpgrade.parachuteStrength);
+                }
+                else if (selectedUpgradeOption == "Max Temp")
+                {
+                    upgradeFunction = KRnDGUI.UpgradeMaxTemperature;
+                    currentUpgradeCount = currentUpgrade.maxTemperature;
+                    nextUpgradeCount = ++nextUpgrade.maxTemperature;
+                    currentImprovement = KRnD.calculateImprovementFactor(rndModule.maxTemperature_improvement, rndModule.maxTemperature_improvementScale, currentUpgrade.maxTemperature);
+                    nextImprovement = KRnD.calculateImprovementFactor(rndModule.maxTemperature_improvement, rndModule.maxTemperature_improvementScale, nextUpgrade.maxTemperature);
+                    scienceCost = KRnD.calculateScienceCost(rndModule.maxTemperature_scienceCost, rndModule.maxTemperature_costScale, nextUpgrade.maxTemperature);
+                }
                 else throw new Exception("unexpected option '" + selectedUpgradeOption + "'");
                 String newInfo = getPartInfo(part, nextUpgrade); // Calculate part-info if the selected stat was upgraded.
                 newInfo = highlightChanges(currentInfo, newInfo);
 
                 // Current stats:
                 GUILayout.BeginArea(new Rect(10 + optionsWidth + 10, 30, windowStyle.fixedWidth, 20));
-                GUILayout.Label("<color=#FFFFFF><b>Current:</b> " + currentUpgradeCount.ToString() + " (" + currentImprovement.ToString("+0.##%;-0.##%;-") + ")</color>", this.labelStyle);
+                GUILayout.Label("<color=#FFFFFF><b>Current:</b> " + currentUpgradeCount.ToString() + " (" + currentImprovement.ToString("+0.##%;-0.##%;-") + ")</color>", labelStyle);
                 GUILayout.EndArea();
 
-                float areaWidth = ( this.windowStyle.fixedWidth - 20 - optionsWidth ) / 2;
+                float areaWidth = ( windowStyle.fixedWidth - 20 - optionsWidth ) / 2;
                 float areaHeight = optionsHeight;
                 GUILayout.BeginArea(new Rect(10 + optionsWidth, 30 + 20, areaWidth, areaHeight));
-                this.scrollPos = GUILayout.BeginScrollView(this.scrollPos, this.scrollStyle, GUILayout.Width(areaWidth), GUILayout.Height(areaHeight));
+                scrollPos = GUILayout.BeginScrollView(scrollPos, scrollStyle, GUILayout.Width(areaWidth), GUILayout.Height(areaHeight));
 
-                GUILayout.Label(currentInfo, this.labelStyleSmall);
+                GUILayout.Label(currentInfo, labelStyleSmall);
                 GUILayout.EndScrollView();
                 GUILayout.EndArea();
 
                 // Next stats:
                 GUILayout.BeginArea(new Rect(10 + optionsWidth + areaWidth + 10, 30, windowStyle.fixedWidth, 20));
-                GUILayout.Label("<color=#FFFFFF><b>Next upgrade:</b> " + nextUpgradeCount.ToString() + " (" + nextImprovement.ToString("+0.##%;-0.##%;-") + ")</color>", this.labelStyle);
+                GUILayout.Label("<color=#FFFFFF><b>Next upgrade:</b> " + nextUpgradeCount.ToString() + " (" + nextImprovement.ToString("+0.##%;-0.##%;-") + ")</color>", labelStyle);
                 GUILayout.EndArea();
 
                 GUILayout.BeginArea(new Rect(10 + optionsWidth + areaWidth, 30 + 20, areaWidth, areaHeight));
-                this.scrollPos = GUILayout.BeginScrollView(this.scrollPos, this.scrollStyle, GUILayout.Width(areaWidth), GUILayout.Height(areaHeight));
-                GUILayout.Label(newInfo, this.labelStyleSmall);
+                scrollPos = GUILayout.BeginScrollView(scrollPos, scrollStyle, GUILayout.Width(areaWidth), GUILayout.Height(areaHeight));
+                GUILayout.Label(newInfo, labelStyleSmall);
                 GUILayout.EndScrollView();
                 GUILayout.EndArea();
 
@@ -645,12 +732,12 @@ namespace KRnD
                     if (ResearchAndDevelopment.Instance != null) currentScience = ResearchAndDevelopment.Instance.Science;
                     String color = "FF0000";
                     if (currentScience >= scienceCost) color = "00FF00";
-                    GUILayout.Label("<b>Science: <color=#" + color + ">" + scienceCost.ToString() + " / " + Math.Floor(currentScience).ToString() + "</color></b>", this.labelStyle);
+                    GUILayout.Label("<b>Science: <color=#" + color + ">" + scienceCost.ToString() + " / " + Math.Floor(currentScience).ToString() + "</color></b>", labelStyle);
                     GUILayout.EndArea();
                     if (currentScience >= scienceCost && ResearchAndDevelopment.Instance != null && upgradeFunction != null)
                     {
                         GUILayout.BeginArea(new Rect(windowStyle.fixedWidth - 110, windowStyle.fixedHeight - 30, 100, 30));
-                        if (GUILayout.Button("Research", this.buttonStyle))
+                        if (GUILayout.Button("Research", buttonStyle))
                         {
                             upgradeFunction(part);
                             ResearchAndDevelopment.Instance.AddScience(-scienceCost, TransactionReasons.RnDTechResearch);

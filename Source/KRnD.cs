@@ -25,6 +25,8 @@ namespace KRnD
         public int batteryCharge = 0;
         public int generatorEfficiency = 0;
         public int converterEfficiency = 0;
+        public int parachuteStrength = 0;
+        public int maxTemperature = 0;
 
         public const String ISP_VAC = "ispVac";
         public const String ISP_ATM = "ispAtm";
@@ -36,6 +38,8 @@ namespace KRnD
         public const String BATTERY_CHARGE = "batteryCharge";
         public const String GENERATOR_EFFICIENCY = "generatorEfficiency";
         public const String CONVERTER_EFFICIENCY = "converterEfficiency";
+        public const String PARACHUTE_STRENGTH = "parachuteStrength";
+        public const String MAX_TEMPERATURE = "maxTemperature";
 
         public override string ToString()
         {
@@ -49,7 +53,9 @@ namespace KRnD
                 CRASH_TOLERANCE+":" + this.crashTolerance.ToString() + "," +
                 BATTERY_CHARGE+":" + this.batteryCharge.ToString() + "," +
                 GENERATOR_EFFICIENCY + ":" + this.generatorEfficiency.ToString() + "," +
-                CONVERTER_EFFICIENCY + ":" + this.converterEfficiency.ToString() +
+                CONVERTER_EFFICIENCY + ":" + this.converterEfficiency.ToString() + "," +
+                PARACHUTE_STRENGTH + ":" + this.parachuteStrength.ToString() + "," +
+                MAX_TEMPERATURE + ":" + this.maxTemperature.ToString() +
                 ")";
         }
 
@@ -66,6 +72,8 @@ namespace KRnD
             if (this.batteryCharge > 0) node.AddValue(BATTERY_CHARGE, this.batteryCharge.ToString());
             if (this.generatorEfficiency > 0) node.AddValue(GENERATOR_EFFICIENCY, this.generatorEfficiency.ToString());
             if (this.converterEfficiency > 0) node.AddValue(CONVERTER_EFFICIENCY, this.converterEfficiency.ToString());
+            if (this.parachuteStrength > 0) node.AddValue(PARACHUTE_STRENGTH, this.parachuteStrength.ToString());
+            if (this.maxTemperature > 0) node.AddValue(MAX_TEMPERATURE, this.maxTemperature.ToString());
             return node;
         }
 
@@ -82,6 +90,8 @@ namespace KRnD
             if (node.HasValue(BATTERY_CHARGE)) upgrade.batteryCharge = Int32.Parse(node.GetValue(BATTERY_CHARGE));
             if (node.HasValue(GENERATOR_EFFICIENCY)) upgrade.generatorEfficiency = Int32.Parse(node.GetValue(GENERATOR_EFFICIENCY));
             if (node.HasValue(CONVERTER_EFFICIENCY)) upgrade.converterEfficiency = Int32.Parse(node.GetValue(CONVERTER_EFFICIENCY));
+            if (node.HasValue(PARACHUTE_STRENGTH)) upgrade.parachuteStrength = Int32.Parse(node.GetValue(PARACHUTE_STRENGTH));
+            if (node.HasValue(MAX_TEMPERATURE)) upgrade.maxTemperature = Int32.Parse(node.GetValue(MAX_TEMPERATURE));
             return upgrade;
         }
 
@@ -98,6 +108,8 @@ namespace KRnD
             copy.batteryCharge = this.batteryCharge;
             copy.generatorEfficiency = this.generatorEfficiency;
             copy.converterEfficiency = this.converterEfficiency;
+            copy.parachuteStrength = this.parachuteStrength;
+            copy.maxTemperature = this.maxTemperature;
             return copy;
         }
     }
@@ -107,41 +119,58 @@ namespace KRnD
     public class PartStats
     {
         public float mass = 0;
-        public float maxFuelFlow = 0;
-        public FloatCurve atmosphereCurve = null;
+        public List<float> maxFuelFlows = null;
+        public List<FloatCurve> atmosphereCurves = null;
         public float torque = 0;
         public float chargeRate = 0;
         public float crashTolerance = 0;
         public double batteryCharge = 0;
         public Dictionary<String, double> generatorEfficiency = null; // Resource-Name, Rate
         public Dictionary<String, Dictionary<String, double>> converterEfficiency = null; // Converter Name, (Resource-Name, Ratio)
+        public double chuteMaxTemp = 0;
+        public double skinMaxTemp = 0;
+        public double intMaxTemp = 0;
 
         public PartStats(Part part)
         {
             this.mass = part.mass;
+            this.skinMaxTemp = part.skinMaxTemp;
+            this.intMaxTemp = part.maxTemp;
 
             // There should only be one or the other, engines or RCS:
-            ModuleEngines engineModule = KRnD.getEnginesModule(part);
+            List<ModuleEngines> engineModules = KRnD.getEngineModules(part);
             ModuleRCS rcsModule = KRnD.getRcsModule(part);
-            if (engineModule)
+            if (engineModules != null)
             {
-                this.maxFuelFlow = engineModule.maxFuelFlow;
-                this.atmosphereCurve = new FloatCurve();
-                for (int i = 0; i < engineModule.atmosphereCurve.Curve.length; i++)
+                this.maxFuelFlows = new List<float>();
+                this.atmosphereCurves = new List<FloatCurve>();
+
+                foreach (ModuleEngines engineModule in engineModules)
                 {
-                    Keyframe frame = engineModule.atmosphereCurve.Curve[i];
-                    this.atmosphereCurve.Add(frame.time, frame.value);
+                    this.maxFuelFlows.Add(engineModule.maxFuelFlow);
+
+                    FloatCurve atmosphereCurve = new FloatCurve();
+                    for (int i = 0; i < engineModule.atmosphereCurve.Curve.length; i++)
+                    {
+                        Keyframe frame = engineModule.atmosphereCurve.Curve[i];
+                        atmosphereCurve.Add(frame.time, frame.value);
+                    }
+                    this.atmosphereCurves.Add(atmosphereCurve);
                 }
             }
             else if (rcsModule)
             {
-                this.maxFuelFlow = rcsModule.thrusterPower;
-                this.atmosphereCurve = new FloatCurve();
+                this.maxFuelFlows = new List<float>();
+                this.atmosphereCurves = new List<FloatCurve>();
+
+                this.maxFuelFlows.Add(rcsModule.thrusterPower);
+                FloatCurve atmosphereCurve = new FloatCurve();
                 for (int i = 0; i < rcsModule.atmosphereCurve.Curve.length; i++)
                 {
                     Keyframe frame = rcsModule.atmosphereCurve.Curve[i];
-                    this.atmosphereCurve.Add(frame.time, frame.value);
+                    atmosphereCurve.Add(frame.time, frame.value);
                 }
+                this.atmosphereCurves.Add(atmosphereCurve);
             }
 
             ModuleReactionWheel reactionWheel = KRnD.getReactionWheelModule(part);
@@ -156,7 +185,7 @@ namespace KRnD
                 this.chargeRate = solarPanel.chargeRate;
             }
 
-            ModuleLandingLeg landingLeg = KRnD.getLandingLegModule(part);
+            ModuleWheelBase landingLeg = KRnD.getLandingLegModule(part);
             if (landingLeg)
             {
                 this.crashTolerance = part.crashTolerance; // Every part has a crash tolerance, but we only want to improve landing legs.
@@ -172,7 +201,7 @@ namespace KRnD
             if (generator)
             {
                 generatorEfficiency = new Dictionary<String, double>();
-                foreach (ModuleGenerator.GeneratorResource outputResource in generator.outputList)
+                foreach (ModuleResource outputResource in generator.outputList)
                 {
                     generatorEfficiency.Add(outputResource.name, outputResource.rate);
                 }
@@ -192,6 +221,12 @@ namespace KRnD
                     }
                     converterEfficiency.Add(converter.ConverterName, thisConverterEfficiency);
                 }
+            }
+
+            ModuleParachute parachute = KRnD.getParachuteModule(part);
+            if (parachute)
+            {
+                this.chuteMaxTemp = parachute.chuteMaxTemp;
             }
         }
     }
@@ -213,12 +248,18 @@ namespace KRnD
             return null;
         }
 
-        public static ModuleEngines getEnginesModule(Part part)
+        // Multi-Mode engines have multiple Engine-Modules which we return as a list.
+        public static List<ModuleEngines> getEngineModules(Part part)
         {
+            List<ModuleEngines> engines = new List<ModuleEngines>();
             foreach (PartModule partModule in part.Modules)
             {
-                if (partModule.moduleName == "ModuleEngines" || partModule.moduleName == "ModuleEnginesFX") return (ModuleEngines)partModule;
+                if (partModule.moduleName == "ModuleEngines" || partModule.moduleName == "ModuleEnginesFX")
+                {
+                    engines.Add((ModuleEngines)partModule);
+                }
             }
+            if (engines.Count > 0) return engines;
             return null;
         }
 
@@ -249,11 +290,16 @@ namespace KRnD
             return null;
         }
 
-        public static ModuleLandingLeg getLandingLegModule(Part part)
+        public static ModuleWheelBase getLandingLegModule(Part part)
         {
+            ModuleWheelBase wheelBase = null;
             foreach (PartModule partModule in part.Modules)
             {
-                if (partModule.moduleName == "ModuleLandingLeg") return (ModuleLandingLeg)partModule;
+                if (partModule.moduleName == "ModuleWheelBase")
+                {
+                    wheelBase = (ModuleWheelBase)partModule;
+                    if (wheelBase.wheelType == WheelType.LEG) return wheelBase;
+                }
             }
             return null;
         }
@@ -262,7 +308,8 @@ namespace KRnD
         {
             foreach (PartResource partResource in part.Resources)
             {
-                if (partResource.resourceName == "ElectricCharge") return partResource;
+                // Engines with an alternator might have a max-amount of 0, skip thoses:
+                if (partResource.resourceName == "ElectricCharge" && partResource.maxAmount > 0) return partResource;
             }
             return null;
         }
@@ -285,6 +332,15 @@ namespace KRnD
             }
             if (converters.Count == 0) return null;
             return converters;
+        }
+
+        public static ModuleParachute getParachuteModule(Part part)
+        {
+            foreach (PartModule partModule in part.Modules)
+            {
+                if (partModule.moduleName == "ModuleParachute") return (ModuleParachute)partModule;
+            }
+            return null;
         }
 
         public static float calculateImprovementFactor(float baseImprovement, float improvementScale, int upgrades)
@@ -330,13 +386,16 @@ namespace KRnD
 
                     // Rebuild the info-screen:
                     int converterModuleNumber = 0; // There might be multiple modules of this type
+                    int engineModuleNumber = 0; // There might be multiple modules of this type
                     foreach (AvailablePart.ModuleInfo info in part.moduleInfos)
                     {
                         if (info.moduleName.ToLower() == "engine")
                         {
-                            ModuleEngines engines = KRnD.getEnginesModule(part.partPrefab);
-                            info.info = engines.GetInfo();
-                            info.primaryInfo = engines.GetPrimaryField();
+                            List<ModuleEngines> engines = KRnD.getEngineModules(part.partPrefab);
+                            ModuleEngines engine = engines[engineModuleNumber];
+                            info.info = engine.GetInfo();
+                            info.primaryInfo = engine.GetPrimaryField();
+                            engineModuleNumber++;
                         }
                         else if (info.moduleName.ToLower() == "rcs")
                         {
@@ -355,7 +414,7 @@ namespace KRnD
                         }
                         else if (info.moduleName.ToLower() == "landing leg")
                         {
-                            ModuleLandingLeg landingLeg = KRnD.getLandingLegModule(part.partPrefab);
+                            ModuleWheelBase landingLeg = KRnD.getLandingLegModule(part.partPrefab);
                             info.info = landingLeg.GetInfo();
                         }
                         else if (info.moduleName.ToLower() == "generator")
@@ -370,13 +429,18 @@ namespace KRnD
                             info.info = converter.GetInfo();
                             converterModuleNumber++;
                         }
+                        else if (info.moduleName.ToLower() == "parachute")
+                        {
+                            ModuleParachute parachute = KRnD.getParachuteModule(part.partPrefab);
+                            info.info = parachute.GetInfo();
+                        }
                     }
                     foreach (AvailablePart.ResourceInfo info in part.resourceInfos)
                     {
                         if (info.resourceName.ToLower() == "electric charge")
                         {
                             PartResource electricCharge = KRnD.getChargeResource(part.partPrefab);
-                            info.info = electricCharge.GetInfo();
+                            if (electricCharge) info.info = electricCharge.GetInfo();
                         }
                     }
                     upgradesApplied++;
@@ -465,15 +529,24 @@ namespace KRnD
                 rndModule.dryMass_upgrades = upgradesToApply.dryMass;
                 part.mass = originalStats.mass * ( 1 + KRnD.calculateImprovementFactor(rndModule.dryMass_improvement, rndModule.dryMass_improvementScale, upgradesToApply.dryMass) );
                 
+                // Max Int/Skin Temp:
+                rndModule.maxTemperature_upgrades = upgradesToApply.maxTemperature;
+                double tempFactor = (1 + KRnD.calculateImprovementFactor(rndModule.maxTemperature_improvement, rndModule.maxTemperature_improvementScale, upgradesToApply.maxTemperature));
+                part.skinMaxTemp = originalStats.skinMaxTemp * tempFactor;
+                part.maxTemp = originalStats.intMaxTemp * tempFactor;
+
                 // Fuel Flow:
-                ModuleEngines engineModule = KRnD.getEnginesModule(part);
+                List<ModuleEngines> engineModules = KRnD.getEngineModules(part);
                 ModuleRCS rcsModule = KRnD.getRcsModule(part);
-                if (engineModule || rcsModule)
+                if (engineModules != null || rcsModule)
                 {
                     rndModule.fuelFlow_upgrades = upgradesToApply.fuelFlow;
-                    float maxFuelFlow  = originalStats.maxFuelFlow * ( 1 + KRnD.calculateImprovementFactor(rndModule.fuelFlow_improvement, rndModule.fuelFlow_improvementScale, upgradesToApply.fuelFlow) );
-                    if (engineModule) engineModule.maxFuelFlow = maxFuelFlow;
-                    else if (rcsModule) rcsModule.thrusterPower = maxFuelFlow;
+                    for (int i = 0; i < originalStats.maxFuelFlows.Count; i++)
+                    {
+                        float maxFuelFlow = originalStats.maxFuelFlows[i] * (1 + KRnD.calculateImprovementFactor(rndModule.fuelFlow_improvement, rndModule.fuelFlow_improvementScale, upgradesToApply.fuelFlow));
+                        if (engineModules != null) engineModules[i].maxFuelFlow = maxFuelFlow;
+                        else if (rcsModule) rcsModule.thrusterPower = maxFuelFlow; // There is only one rcs-module
+                    }
                 }
                 else
                 {
@@ -481,31 +554,37 @@ namespace KRnD
                 }
 
                 // ISP Vac & Atm:
-                if (engineModule || rcsModule)
+                if (engineModules != null || rcsModule)
                 {
                     rndModule.ispVac_upgrades = upgradesToApply.ispVac;
                     rndModule.ispAtm_upgrades = upgradesToApply.ispAtm;
                     float improvementFactorVac = 1 + KRnD.calculateImprovementFactor(rndModule.ispVac_improvement, rndModule.ispVac_improvementScale, upgradesToApply.ispVac);
                     float improvementFactorAtm = 1 + KRnD.calculateImprovementFactor(rndModule.ispAtm_improvement, rndModule.ispAtm_improvementScale, upgradesToApply.ispAtm);
 
-                    FloatCurve fc = new FloatCurve();
-                    for (int v = 0; v < originalStats.atmosphereCurve.Curve.length; v++)
+                    for (int i = 0; i < originalStats.atmosphereCurves.Count ;i++)
                     {
-                        Keyframe frame = originalStats.atmosphereCurve.Curve[v];
-
-                        float pressure = frame.time;
-                        float factorAtThisPressure = 1;
-                        if (pressure == 0) factorAtThisPressure = improvementFactorVac; // In complete vacuum
-                        else if (pressure >= 1) factorAtThisPressure = improvementFactorAtm; // At lowest kerbal atmosphere
-                        else
+                        bool isAirbreather = false;
+                        if (engineModules != null) isAirbreather = engineModules[i].engineType == EngineType.Turbine || engineModules[i].engineType == EngineType.Piston || engineModules[i].engineType == EngineType.ScramJet;
+                        FloatCurve fc = new FloatCurve();
+                        for (int v = 0; v < originalStats.atmosphereCurves[i].Curve.length; v++)
                         {
-                            factorAtThisPressure = (1 - pressure) * improvementFactorVac + pressure * improvementFactorAtm; // Mix both
+                            Keyframe frame = originalStats.atmosphereCurves[i].Curve[v];
+
+                            float pressure = frame.time;
+                            float factorAtThisPressure = 1;
+                            if (isAirbreather && originalStats.atmosphereCurves[i].Curve.length == 1) factorAtThisPressure = improvementFactorAtm; // Airbreathing engines have a preassure curve starting at 0, but they should use Atm. as improvement factor.
+                            else if (pressure == 0) factorAtThisPressure = improvementFactorVac; // In complete vacuum
+                            else if (pressure >= 1) factorAtThisPressure = improvementFactorAtm; // At lowest kerbal atmosphere
+                            else
+                            {
+                                factorAtThisPressure = (1 - pressure) * improvementFactorVac + pressure * improvementFactorAtm; // Mix both
+                            }
+                            float newValue = frame.value * factorAtThisPressure;
+                            fc.Add(pressure, newValue);
                         }
-                        float newValue = frame.value * factorAtThisPressure;
-                        fc.Add(pressure, newValue);
+                        if (engineModules != null) engineModules[i].atmosphereCurve = fc;
+                        else if (rcsModule) rcsModule.atmosphereCurve = fc; // There is only one rcs-module
                     }
-                    if (engineModule) engineModule.atmosphereCurve = fc;
-                    else if (rcsModule) rcsModule.atmosphereCurve = fc;
                 }
                 else
                 {
@@ -542,7 +621,7 @@ namespace KRnD
                 }
 
                 // Crash Tolerance (only for landing legs):
-                ModuleLandingLeg landingLeg = KRnD.getLandingLegModule(part);
+                ModuleWheelBase landingLeg = KRnD.getLandingLegModule(part);
                 if (landingLeg)
                 {
                     rndModule.crashTolerance_upgrades = upgradesToApply.crashTolerance;
@@ -578,7 +657,8 @@ namespace KRnD
                 if (generator)
                 {
                     rndModule.generatorEfficiency_upgrades = upgradesToApply.generatorEfficiency;
-                    foreach (ModuleGenerator.GeneratorResource outputResource in generator.outputList)
+
+                    foreach (ModuleResource outputResource in generator.outputList)
                     {
                         double originalRate;
                         if (!originalStats.generatorEfficiency.TryGetValue(outputResource.name, out originalRate)) continue;
@@ -611,6 +691,19 @@ namespace KRnD
                 else
                 {
                     rndModule.converterEfficiency_upgrades = 0;
+                }
+
+                // Parachute Strength:
+                ModuleParachute parachute = KRnD.getParachuteModule(part);
+                if (parachute)
+                {
+                    rndModule.parachuteStrength_upgrades = upgradesToApply.parachuteStrength;
+                    double chuteMaxTemp = originalStats.chuteMaxTemp * (1 + KRnD.calculateImprovementFactor(rndModule.parachuteStrength_improvement, rndModule.parachuteStrength_improvementScale, upgradesToApply.parachuteStrength));
+                    parachute.chuteMaxTemp = chuteMaxTemp; // The safe deployment-speed is derived from the temperature
+                }
+                else
+                {
+                    rndModule.parachuteStrength_upgrades = 0;
                 }
 
             }
@@ -682,7 +775,7 @@ namespace KRnD
         {
             try
             {
-                if (ev != ConstructionEventType.PartCreated && ev != ConstructionEventType.PartDetached && ev != ConstructionEventType.PartAttached) return;
+                if (ev != ConstructionEventType.PartCreated && ev != ConstructionEventType.PartDetached && ev != ConstructionEventType.PartAttached && ev != ConstructionEventType.PartDragging) return;
                 KRnDGUI.selectedPart = part;
             }
             catch (Exception e)

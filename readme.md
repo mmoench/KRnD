@@ -8,6 +8,7 @@
 
 ## Requirements
 
++ KSP 1.1
 + [Module Manager](https://github.com/sarbian/ModuleManager)
 
 ## Status 
@@ -24,5 +25,7 @@ At the moment you can improve the following stats::
 + Battery capacity
 + Efficiency of Generators (eg RTGs)
 + Efficiency of Resource Converters
++ Deployment-speed for Parachutes
++ Maximum internal- and skin-temperature
 
-If you have any problems with this mod or would like to suggest an improvement, please go to the official [forum thread](http://forum.kerbalspaceprogram.com/) or open a new ticket on [Github](https://github.com/mmoench/KRnD).
+If you have any problems with this mod or would like to suggest an improvement, please go to the official [forum thread](http://forum.kerbalspaceprogram.com/index.php?/topic/128204-105-kerbal-research-development/) or open a new ticket on [Github](https://github.com/mmoench/KRnD).
