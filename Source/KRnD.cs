@@ -450,6 +450,11 @@ namespace KRnD
                             ModuleParachute parachute = KRnD.getParachuteModule(part.partPrefab);
                             info.info = parachute.GetInfo();
                         }
+                        else if (info.moduleName.ToLower() == "custom-built fairing")
+                        {
+                            ModuleProceduralFairing fairing = KRnD.getFairingModule(part.partPrefab);
+                            info.info = fairing.GetInfo();
+                        }
                     }
                     foreach (AvailablePart.ResourceInfo info in part.resourceInfos)
                     {
