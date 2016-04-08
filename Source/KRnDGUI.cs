@@ -357,6 +357,7 @@ namespace KRnD
                 ModuleGenerator generatorModule = KRnD.getGeneratorModule(part);
                 List<ModuleResourceConverter> converterModules = KRnD.getConverterModules(part);
                 ModuleParachute parachuteModule = KRnD.getParachuteModule(part);
+                ModuleProceduralFairing fairingModule = KRnD.getFairingModule(part);
 
                 // Basic stats:
                 info = "<color=#FFFFFF><b>Dry Mass:</b> "+ part.mass.ToString("0.#### t") +"\n";
@@ -388,6 +389,7 @@ namespace KRnD
                     }
                 }
                 if (parachuteModule) info += "<color=#99FF00><b>Parachute:</b></color>\n" + parachuteModule.GetInfo();
+                if (fairingModule) info += "<color=#99FF00><b>Fairing:</b></color>\n" + fairingModule.GetInfo();
                 info += "</color>";
             }
             catch (Exception e)

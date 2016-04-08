@@ -130,6 +130,7 @@ namespace KRnD
         public double chuteMaxTemp = 0;
         public double skinMaxTemp = 0;
         public double intMaxTemp = 0;
+        public float fairingAreaMass = 0;
 
         public PartStats(Part part)
         {
@@ -227,6 +228,12 @@ namespace KRnD
             if (parachute)
             {
                 this.chuteMaxTemp = parachute.chuteMaxTemp;
+            }
+
+            ModuleProceduralFairing fairing = KRnD.getFairingModule(part);
+            if (fairing)
+            {
+                this.fairingAreaMass = fairing.UnitAreaMass;
             }
         }
     }
@@ -339,6 +346,15 @@ namespace KRnD
             foreach (PartModule partModule in part.Modules)
             {
                 if (partModule.moduleName == "ModuleParachute") return (ModuleParachute)partModule;
+            }
+            return null;
+        }
+
+        public static ModuleProceduralFairing getFairingModule(Part part)
+        {
+            foreach (PartModule partModule in part.Modules)
+            {
+                if (partModule.moduleName == "ModuleProceduralFairing") return (ModuleProceduralFairing)partModule;
             }
             return null;
         }
@@ -527,7 +543,16 @@ namespace KRnD
 
                 // Dry Mass:
                 rndModule.dryMass_upgrades = upgradesToApply.dryMass;
-                part.mass = originalStats.mass * ( 1 + KRnD.calculateImprovementFactor(rndModule.dryMass_improvement, rndModule.dryMass_improvementScale, upgradesToApply.dryMass) );
+                float dryMassFactor = 1 + KRnD.calculateImprovementFactor(rndModule.dryMass_improvement, rndModule.dryMass_improvementScale, upgradesToApply.dryMass);
+                part.mass = originalStats.mass * dryMassFactor;
+                part.prefabMass = part.mass; // New in ksp 1.1, if this is correct is just guesswork however...
+
+                // Dry Mass also improves fairing mass:
+                ModuleProceduralFairing fairngModule = KRnD.getFairingModule(part);
+                if (fairngModule)
+                {
+                    fairngModule.UnitAreaMass = originalStats.fairingAreaMass * dryMassFactor;
+                }
                 
                 // Max Int/Skin Temp:
                 rndModule.maxTemperature_upgrades = upgradesToApply.maxTemperature;
