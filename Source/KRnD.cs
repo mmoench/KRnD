@@ -27,6 +27,7 @@ namespace KRnD
         public int converterEfficiency = 0;
         public int parachuteStrength = 0;
         public int maxTemperature = 0;
+        public int fuelCapacity = 0;
 
         public const String ISP_VAC = "ispVac";
         public const String ISP_ATM = "ispAtm";
@@ -40,6 +41,7 @@ namespace KRnD
         public const String CONVERTER_EFFICIENCY = "converterEfficiency";
         public const String PARACHUTE_STRENGTH = "parachuteStrength";
         public const String MAX_TEMPERATURE = "maxTemperature";
+        public const String FUEL_CAPACITY = "fuelCapacity";
 
         public override string ToString()
         {
@@ -55,7 +57,8 @@ namespace KRnD
                 GENERATOR_EFFICIENCY + ":" + this.generatorEfficiency.ToString() + "," +
                 CONVERTER_EFFICIENCY + ":" + this.converterEfficiency.ToString() + "," +
                 PARACHUTE_STRENGTH + ":" + this.parachuteStrength.ToString() + "," +
-                MAX_TEMPERATURE + ":" + this.maxTemperature.ToString() +
+                MAX_TEMPERATURE + ":" + this.maxTemperature.ToString() + "," +
+                FUEL_CAPACITY + ":" + this.fuelCapacity +
                 ")";
         }
 
@@ -74,6 +77,7 @@ namespace KRnD
             if (this.converterEfficiency > 0) node.AddValue(CONVERTER_EFFICIENCY, this.converterEfficiency.ToString());
             if (this.parachuteStrength > 0) node.AddValue(PARACHUTE_STRENGTH, this.parachuteStrength.ToString());
             if (this.maxTemperature > 0) node.AddValue(MAX_TEMPERATURE, this.maxTemperature.ToString());
+            if (this.fuelCapacity > 0) node.AddValue(FUEL_CAPACITY, this.fuelCapacity.ToString());
             return node;
         }
 
@@ -92,6 +96,7 @@ namespace KRnD
             if (node.HasValue(CONVERTER_EFFICIENCY)) upgrade.converterEfficiency = Int32.Parse(node.GetValue(CONVERTER_EFFICIENCY));
             if (node.HasValue(PARACHUTE_STRENGTH)) upgrade.parachuteStrength = Int32.Parse(node.GetValue(PARACHUTE_STRENGTH));
             if (node.HasValue(MAX_TEMPERATURE)) upgrade.maxTemperature = Int32.Parse(node.GetValue(MAX_TEMPERATURE));
+            if (node.HasValue(FUEL_CAPACITY)) upgrade.fuelCapacity = Int32.Parse(node.GetValue(FUEL_CAPACITY));
             return upgrade;
         }
 
@@ -110,6 +115,7 @@ namespace KRnD
             copy.converterEfficiency = this.converterEfficiency;
             copy.parachuteStrength = this.parachuteStrength;
             copy.maxTemperature = this.maxTemperature;
+            copy.fuelCapacity = this.fuelCapacity;
             return copy;
         }
     }
@@ -131,6 +137,8 @@ namespace KRnD
         public double skinMaxTemp = 0;
         public double intMaxTemp = 0;
         public float fairingAreaMass = 0;
+        public Dictionary<String, double> fuelCapacities = null; // Resource-Name, capacity
+        public double fuelCapacitiesSum = 0; // Sum of all fuel capacities
 
         public PartStats(Part part)
         {
@@ -235,6 +243,18 @@ namespace KRnD
             {
                 this.fairingAreaMass = fairing.UnitAreaMass;
             }
+
+            List<PartResource> fuelResources = KRnD.getFuelResources(part);
+            if (fuelResources != null)
+            {
+                fuelCapacities = new Dictionary<string,double>();
+                fuelCapacitiesSum = 0;
+                foreach (PartResource fuelResource in fuelResources)
+                {
+                    fuelCapacities.Add(fuelResource.resourceName, fuelResource.maxAmount);
+                    fuelCapacitiesSum += fuelResource.maxAmount;
+                }
+            }
         }
     }
 
@@ -243,8 +263,8 @@ namespace KRnD
     {
         private static bool initialized = false;
         public static Dictionary<string, PartStats> originalStats = null;
-
         public static Dictionary<string, KRnDUpgrade> upgrades = new Dictionary<string, KRnDUpgrade>();
+        public static List<string> fuelResources = null;
 
         public static KRnDModule getKRnDModule(Part part)
         {
@@ -313,12 +333,25 @@ namespace KRnD
 
         public static PartResource getChargeResource(Part part)
         {
+            if (part.Resources == null) return null;
             foreach (PartResource partResource in part.Resources)
             {
                 // Engines with an alternator might have a max-amount of 0, skip thoses:
                 if (partResource.resourceName == "ElectricCharge" && partResource.maxAmount > 0) return partResource;
             }
             return null;
+        }
+
+        public static List<PartResource> getFuelResources(Part part)
+        {
+            if (part.Resources == null) return null;
+            List<PartResource> partFuels = new List<PartResource>();
+            foreach (PartResource partResource in part.Resources)
+            {
+                if (KRnD.fuelResources != null && KRnD.fuelResources.Contains(partResource.resourceName)) partFuels.Add(partResource);
+            }
+            if (partFuels.Count == 0) return null;
+            return partFuels;
         }
 
         public static ModuleGenerator getGeneratorModule(Part part)
@@ -381,7 +414,19 @@ namespace KRnD
                 if (i == 0) cost = baseCost;
                 else cost += baseCost * (float) Math.Pow(costScale, i-1);
             }
+            if (cost > 2147483647) return 2147483647; // Cap at signed 32 bit int
             return (int) Math.Round(cost);
+        }
+
+        // Since KSP 1.1 the info-text of solar panels is not updated correctly, so we have use this workaround-function
+        // to create our own text.
+        public static String getSolarPanelInfo(ModuleDeployableSolarPanel solarModule)
+        {
+            String info = solarModule.GetInfo();
+            float chargeRate = solarModule.chargeRate * solarModule.efficiencyMult;
+            String chargeString = chargeRate.ToString("0.####/s");
+            String prefix = "<b>Electric Charge: </b>";
+            return Regex.Replace(info, prefix + "[0-9.]+/[A-Za-z.]+", prefix + chargeString);
         }
 
         // Updates the global dictionary of available parts with the current set of upgrades (should be
@@ -394,77 +439,101 @@ namespace KRnD
                 if (KRnD.upgrades == null) throw new Exception("upgrades-dictionary missing");
                 foreach (AvailablePart part in PartLoader.Instance.parts)
                 {
-                    KRnDUpgrade upgrade;
-                    if (!KRnD.upgrades.TryGetValue(part.name, out upgrade)) upgrade = new KRnDUpgrade(); // If there are no upgrades, reset the part.
-
-                    // Udate the part to its latest model:
-                    KRnD.updatePart(part.partPrefab, true);
-
-                    // Rebuild the info-screen:
-                    int converterModuleNumber = 0; // There might be multiple modules of this type
-                    int engineModuleNumber = 0; // There might be multiple modules of this type
-                    foreach (AvailablePart.ModuleInfo info in part.moduleInfos)
+                    try
                     {
-                        if (info.moduleName.ToLower() == "engine")
+                        KRnDUpgrade upgrade;
+                        if (!KRnD.upgrades.TryGetValue(part.name, out upgrade)) upgrade = new KRnDUpgrade(); // If there are no upgrades, reset the part.
+
+                        // Udate the part to its latest model:
+                        KRnD.updatePart(part.partPrefab, true);
+
+                        // Rebuild the info-screen:
+                        int converterModuleNumber = 0; // There might be multiple modules of this type
+                        int engineModuleNumber = 0; // There might be multiple modules of this type
+                        foreach (AvailablePart.ModuleInfo info in part.moduleInfos)
                         {
-                            List<ModuleEngines> engines = KRnD.getEngineModules(part.partPrefab);
-                            ModuleEngines engine = engines[engineModuleNumber];
-                            info.info = engine.GetInfo();
-                            info.primaryInfo = engine.GetPrimaryField();
-                            engineModuleNumber++;
+                            if (info.moduleName.ToLower() == "engine")
+                            {
+                                List<ModuleEngines> engines = KRnD.getEngineModules(part.partPrefab);
+                                ModuleEngines engine = engines[engineModuleNumber];
+                                info.info = engine.GetInfo();
+                                info.primaryInfo = engine.GetPrimaryField();
+                                engineModuleNumber++;
+                            }
+                            else if (info.moduleName.ToLower() == "rcs")
+                            {
+                                ModuleRCS rcs = KRnD.getRcsModule(part.partPrefab);
+                                info.info = rcs.GetInfo();
+                            }
+                            else if (info.moduleName.ToLower() == "reaction wheel")
+                            {
+                                ModuleReactionWheel reactionWheel = KRnD.getReactionWheelModule(part.partPrefab);
+                                info.info = reactionWheel.GetInfo();
+                            }
+                            else if (info.moduleName.ToLower() == "deployable solar panel")
+                            {
+                                ModuleDeployableSolarPanel solarPanel = KRnD.getSolarPanelModule(part.partPrefab);
+                                info.info = KRnD.getSolarPanelInfo(solarPanel);
+                            }
+                            else if (info.moduleName.ToLower() == "landing leg")
+                            {
+                                ModuleWheelBase landingLeg = KRnD.getLandingLegModule(part.partPrefab);
+                                info.info = landingLeg.GetInfo();
+                            }
+                            else if (info.moduleName.ToLower() == "generator")
+                            {
+                                ModuleGenerator generator = KRnD.getGeneratorModule(part.partPrefab);
+                                info.info = generator.GetInfo();
+                            }
+                            else if (info.moduleName.ToLower() == "resource converter")
+                            {
+                                List<ModuleResourceConverter> converterList = KRnD.getConverterModules(part.partPrefab);
+                                ModuleResourceConverter converter = converterList[converterModuleNumber];
+                                info.info = converter.GetInfo();
+                                converterModuleNumber++;
+                            }
+                            else if (info.moduleName.ToLower() == "parachute")
+                            {
+                                ModuleParachute parachute = KRnD.getParachuteModule(part.partPrefab);
+                                info.info = parachute.GetInfo();
+                            }
+                            else if (info.moduleName.ToLower() == "custom-built fairing")
+                            {
+                                ModuleProceduralFairing fairing = KRnD.getFairingModule(part.partPrefab);
+                                info.info = fairing.GetInfo();
+                            }
                         }
-                        else if (info.moduleName.ToLower() == "rcs")
+
+                        List<PartResource> fuelResources = KRnD.getFuelResources(part.partPrefab);
+                        PartResource electricCharge = KRnD.getChargeResource(part.partPrefab);
+                        foreach (AvailablePart.ResourceInfo info in part.resourceInfos)
                         {
-                            ModuleRCS rcs = KRnD.getRcsModule(part.partPrefab);
-                            info.info = rcs.GetInfo();
+                            // The Resource-Names are not always formated the same way, eg "Electric Charge" vs "ElectricCharge", so we do some reformating.
+                            if (electricCharge && info.resourceName.Replace(" ", "").ToLower() == electricCharge.resourceName.Replace(" ", "").ToLower())
+                            {
+                                info.info = electricCharge.GetInfo();
+                                info.primaryInfo = "<b>" + info.resourceName + ":</b> " + electricCharge.maxAmount.ToString();
+                            }
+                            else if (fuelResources != null)
+                            {
+                                foreach (PartResource fuelResource in fuelResources)
+                                {
+                                    if (info.resourceName.Replace(" ", "").ToLower() == fuelResource.resourceName.Replace(" ", "").ToLower())
+                                    {
+                                        info.info = fuelResource.GetInfo();
+                                        info.primaryInfo = "<b>" + info.resourceName + ":</b> " + fuelResource.maxAmount.ToString();
+                                        break;
+                                    }
+                                }
+                            }
                         }
-                        else if (info.moduleName.ToLower() == "reaction wheel")
-                        {
-                            ModuleReactionWheel reactionWheel = KRnD.getReactionWheelModule(part.partPrefab);
-                            info.info = reactionWheel.GetInfo();
-                        }
-                        else if (info.moduleName.ToLower() == "deployable solar panel")
-                        {
-                            ModuleDeployableSolarPanel solarPanel = KRnD.getSolarPanelModule(part.partPrefab);
-                            info.info = solarPanel.GetInfo();
-                        }
-                        else if (info.moduleName.ToLower() == "landing leg")
-                        {
-                            ModuleWheelBase landingLeg = KRnD.getLandingLegModule(part.partPrefab);
-                            info.info = landingLeg.GetInfo();
-                        }
-                        else if (info.moduleName.ToLower() == "generator")
-                        {
-                            ModuleGenerator generator = KRnD.getGeneratorModule(part.partPrefab);
-                            info.info = generator.GetInfo();
-                        }
-                        else if (info.moduleName.ToLower() == "resource converter")
-                        {
-                            List<ModuleResourceConverter> converterList = KRnD.getConverterModules(part.partPrefab);
-                            ModuleResourceConverter converter = converterList[converterModuleNumber];
-                            info.info = converter.GetInfo();
-                            converterModuleNumber++;
-                        }
-                        else if (info.moduleName.ToLower() == "parachute")
-                        {
-                            ModuleParachute parachute = KRnD.getParachuteModule(part.partPrefab);
-                            info.info = parachute.GetInfo();
-                        }
-                        else if (info.moduleName.ToLower() == "custom-built fairing")
-                        {
-                            ModuleProceduralFairing fairing = KRnD.getFairingModule(part.partPrefab);
-                            info.info = fairing.GetInfo();
-                        }
+
+                        upgradesApplied++;
                     }
-                    foreach (AvailablePart.ResourceInfo info in part.resourceInfos)
+                    catch (Exception e)
                     {
-                        if (info.resourceName.ToLower() == "electric charge")
-                        {
-                            PartResource electricCharge = KRnD.getChargeResource(part.partPrefab);
-                            if (electricCharge) info.info = electricCharge.GetInfo();
-                        }
+                        Debug.LogError("[KRnD] updateGlobalParts(" + part.title.ToString() + "): " + e.ToString());
                     }
-                    upgradesApplied++;
                 }
             }
             catch (Exception e)
@@ -642,8 +711,12 @@ namespace KRnD
                 if (solarPanel)
                 {
                     rndModule.chargeRate_upgrades = upgradesToApply.chargeRate;
-                    float chargeRate = originalStats.chargeRate * (1 + KRnD.calculateImprovementFactor(rndModule.chargeRate_improvement, rndModule.chargeRate_improvementScale, upgradesToApply.chargeRate));
-                    solarPanel.chargeRate = chargeRate;
+                    float chargeEfficiency = (1 + KRnD.calculateImprovementFactor(rndModule.chargeRate_improvement, rndModule.chargeRate_improvementScale, upgradesToApply.chargeRate));
+                    // Somehow changing the charge-rate stopped working in KSP 1.1, so we use the efficiency instead. This however does not
+                    // show up in the module-info (probably a bug in KSP), which is why we have another workaround to update the info-texts.
+                    // float chargeRate = originalStats.chargeRate * chargeEfficiency;
+                    // solarPanel.chargeRate = chargeRate;
+                    solarPanel.efficiencyMult = chargeEfficiency;
                 }
                 else
                 {
@@ -736,6 +809,32 @@ namespace KRnD
                     rndModule.parachuteStrength_upgrades = 0;
                 }
 
+                // Fuel Capacity:
+                List<PartResource> fuelResources = KRnD.getFuelResources(part);
+                if (fuelResources != null)
+                {
+                    rndModule.fuelCapacity_upgrades = upgradesToApply.fuelCapacity;
+                    double improvementFactor = (1 + KRnD.calculateImprovementFactor(rndModule.fuelCapacity_improvement, rndModule.fuelCapacity_improvementScale, upgradesToApply.fuelCapacity));
+
+                    foreach (PartResource fuelResource in fuelResources)
+                    {
+                        if (!originalStats.fuelCapacities.ContainsKey(fuelResource.resourceName)) continue;
+                        double originalCapacity = originalStats.fuelCapacities[fuelResource.resourceName];
+                        double newCapacity = originalCapacity * improvementFactor;
+                        newCapacity = Math.Round(newCapacity); // We don't want half units of fuel
+
+                        bool tankIsFull = false;
+                        if (fuelResource.amount == fuelResource.maxAmount) tankIsFull = true;
+
+                        fuelResource.maxAmount = newCapacity;
+                        if (tankIsFull) fuelResource.amount = fuelResource.maxAmount;
+                    }
+                }
+                else
+                {
+                    rndModule.fuelCapacity_upgrades = 0;
+                }
+
             }
             catch (Exception e)
             {
@@ -820,6 +919,38 @@ namespace KRnD
         {
             try
             {
+                // Create a list of all valid fuel resources:
+                if (KRnD.fuelResources == null)
+                {
+                    KRnD.fuelResources = new List<string>();
+                    KRnD.fuelResources.Add("MonoPropellant"); // Always use MonoPropellant as fuel (RCS-Thrusters don't have engine modules and are not found with the code below)
+
+                    foreach (AvailablePart aPart in PartLoader.Instance.parts)
+                    {
+                        Part part = aPart.partPrefab;
+                        List<ModuleEngines> engineModules = KRnD.getEngineModules(part);
+                        if (engineModules == null) continue;
+                        foreach (ModuleEngines engineModule in engineModules)
+                        {
+                            if (engineModule.propellants == null) continue;
+                            foreach (Propellant propellant in engineModule.propellants)
+                            {
+                                if (propellant.name == "ElectricCharge") continue; // Electric Charge is improved by batteries.
+                                if (propellant.name == "IntakeAir") continue; // This is no real fuel-type.
+                                if (!fuelResources.Contains(propellant.name)) fuelResources.Add(propellant.name);
+                            }
+                        }
+                    }
+
+                    String listString = "";
+                    foreach (String fuelName in KRnD.fuelResources)
+                    {
+                        if (listString != "") listString += ", ";
+                        listString += fuelName;
+                    }
+                    Debug.Log("[KRnD] found " + KRnD.fuelResources.Count.ToString() + " propellants: " + listString);
+                }
+
                 // Create a backup of all unmodivied parts before we update them. We will later use these backup-parts
                 // for all calculations of upgraded stats.
                 if (KRnD.originalStats == null)

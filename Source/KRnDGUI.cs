@@ -336,6 +336,27 @@ namespace KRnD
             return 0;
         }
 
+        public static int UpgradeFuelCapacity(Part part)
+        {
+            try
+            {
+                KRnDUpgrade store = null;
+                if (!KRnD.upgrades.TryGetValue(part.name, out store))
+                {
+                    store = new KRnDUpgrade();
+                    KRnD.upgrades.Add(part.name, store);
+                }
+                store.fuelCapacity++;
+                KRnD.updateGlobalParts();
+                KRnD.updateEditorVessel();
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[KRnD] UpgradeFuelCapacity(): " + e.ToString());
+            }
+            return 0;
+        }
+
         // Returns the info-text of the given part with the given upgrades to be displayed in the GUI-comparison.
         private String getPartInfo(Part part, KRnDUpgrade upgradesToApply=null)
         {
@@ -358,12 +379,25 @@ namespace KRnD
                 List<ModuleResourceConverter> converterModules = KRnD.getConverterModules(part);
                 ModuleParachute parachuteModule = KRnD.getParachuteModule(part);
                 ModuleProceduralFairing fairingModule = KRnD.getFairingModule(part);
+                List<PartResource> fuelResources = KRnD.getFuelResources(part);
 
                 // Basic stats:
                 info = "<color=#FFFFFF><b>Dry Mass:</b> "+ part.mass.ToString("0.#### t") +"\n";
                 info += "<b>Max Temp.:</b> " + part.maxTemp.ToString("0.#") + "/" + part.skinMaxTemp.ToString("0.#") + " °K\n";
                 if (landingLegModule) info += "<b>Crash Tolerance:</b> " + part.crashTolerance.ToString("0.#### m/s") + "\n";
                 if (electricChargeResource) info += "<b>Electric Charge:</b> " + electricChargeResource.maxAmount.ToString() + "\n";
+                
+                // Fuels:
+                if (fuelResources != null)
+                {
+                    foreach (PartResource fuelResource in fuelResources)
+                    {
+                        // Reformat resource-names like "ElectricCharge" to "Electric Charge":
+                        String fuelName = fuelResource.resourceName.ToString();
+                        fuelName = Regex.Replace(fuelName, @"([a-z])([A-Z])", "$1 $2");
+                        info += "<b>" + fuelName + ":</b> " + fuelResource.maxAmount.ToString() + "\n";
+                    }
+                }
 
                 // Module stats:
                 info += "\n";
@@ -379,7 +413,7 @@ namespace KRnD
                 }
                 if (rcsModule) info += "<color=#99FF00><b>RCS:</b></color>\n" + rcsModule.GetInfo();
                 if (reactionWheelModule) info += "<color=#99FF00><b>Reaction Wheel:</b></color>\n" + reactionWheelModule.GetInfo();
-                if (solarPanelModule) info += "<color=#99FF00><b>Solar Panel:</b></color>\n" + solarPanelModule.GetInfo();
+                if (solarPanelModule) info += "<color=#99FF00><b>Solar Panel:</b></color>\n" + KRnD.getSolarPanelInfo(solarPanelModule);
                 if (generatorModule) info += "<color=#99FF00><b>Generator:</b></color>\n" + generatorModule.GetInfo();
                 if (converterModules != null)
                 {
@@ -459,6 +493,7 @@ namespace KRnD
                 ModuleGenerator generatorModule = null;
                 List<ModuleResourceConverter> converterModules = null;
                 ModuleParachute parachuteModule = null;
+                List<PartResource> fuelResources = null;
                 if (selectedPart != null)
                 {
                     foreach (AvailablePart aPart in PartLoader.Instance.parts)
@@ -482,6 +517,7 @@ namespace KRnD
                         generatorModule = KRnD.getGeneratorModule(part);
                         converterModules = KRnD.getConverterModules(part);
                         parachuteModule = KRnD.getParachuteModule(part);
+                        fuelResources = KRnD.getFuelResources(part);
                     }
                 }
                 if (!part)
@@ -549,6 +585,10 @@ namespace KRnD
                 if (electricChargeResource)
                 {
                     options.Add("Battery");
+                }
+                if (fuelResources != null)
+                {
+                    options.Add("Fuel Pressure");
                 }
                 if (generatorModule)
                 {
@@ -660,6 +700,23 @@ namespace KRnD
                     int scaledCost = (int)Math.Round(rndModule.batteryCharge_scienceCost * scaleReferenceFactor);
                     if (scaledCost < 1) scaledCost = 1;
                     scienceCost = KRnD.calculateScienceCost(scaledCost, rndModule.batteryCharge_costScale, nextUpgrade.batteryCharge);
+                }
+                else if (selectedUpgradeOption == "Fuel Pressure")
+                {
+                    upgradeFunction = KRnDGUI.UpgradeFuelCapacity;
+                    currentUpgradeCount = currentUpgrade.fuelCapacity;
+                    nextUpgradeCount = ++nextUpgrade.fuelCapacity;
+                    currentImprovement = KRnD.calculateImprovementFactor(rndModule.fuelCapacity_improvement, rndModule.fuelCapacity_improvementScale, currentUpgrade.fuelCapacity);
+                    nextImprovement = KRnD.calculateImprovementFactor(rndModule.fuelCapacity_improvement, rndModule.fuelCapacity_improvementScale, nextUpgrade.fuelCapacity);
+
+                    // Scale science cost with original fuel capacity:
+                    PartStats originalStats;
+                    if (!KRnD.originalStats.TryGetValue(part.name, out originalStats)) throw new Exception("no origional-stats for part '" + part.name + "'");
+                    double scaleReferenceFactor = 1;
+                    if (rndModule.fuelCapacity_costScaleReference > 0) scaleReferenceFactor = originalStats.fuelCapacitiesSum / rndModule.fuelCapacity_costScaleReference;
+                    int scaledCost = (int)Math.Round(rndModule.fuelCapacity_scienceCost * scaleReferenceFactor);
+                    if (scaledCost < 1) scaledCost = 1;
+                    scienceCost = KRnD.calculateScienceCost(scaledCost, rndModule.fuelCapacity_costScale, nextUpgrade.fuelCapacity);
                 }
                 else if (selectedUpgradeOption == "Generator")
                 {

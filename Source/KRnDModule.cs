@@ -163,6 +163,20 @@ namespace KRnD
         [KSPField(isPersistant = false)]
         public float maxTemperature_improvementScale = 1f;
 
+        // Fuel Capacity
+        [KSPField(isPersistant = true)]
+        public int fuelCapacity_upgrades = 0;
+        [KSPField(isPersistant = false)]
+        public int fuelCapacity_scienceCost = 5;
+        [KSPField(isPersistant = false)]
+        public float fuelCapacity_costScaleReference = 1000f;
+        [KSPField(isPersistant = false)]
+        public float fuelCapacity_costScale = 2f;
+        [KSPField(isPersistant = false)]
+        public float fuelCapacity_improvement = 0.05f;
+        [KSPField(isPersistant = false)]
+        public float fuelCapacity_improvementScale = 1f;
+
         public static String ToRoman(int number)
         {
             if (number == 0) return "";
@@ -196,7 +210,8 @@ namespace KRnD
                 this.generatorEfficiency_upgrades +
                 this.converterEfficiency_upgrades +
                 this.parachuteStrength_upgrades +
-                this.maxTemperature_upgrades;
+                this.maxTemperature_upgrades +
+                this.fuelCapacity_upgrades;
             if (upgrades == 0) return "";
             return "Mk " + ToRoman(upgrades + 1); // Mk I is the part without upgrades, Mk II the first upgraded version.
         }
@@ -230,6 +245,7 @@ namespace KRnD
             upgrades.converterEfficiency = this.converterEfficiency_upgrades;
             upgrades.parachuteStrength = this.parachuteStrength_upgrades;
             upgrades.maxTemperature = this.maxTemperature_upgrades;
+            upgrades.fuelCapacity = this.fuelCapacity_upgrades;
             return upgrades;
         }
     }

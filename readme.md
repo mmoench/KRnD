@@ -27,5 +27,8 @@ At the moment you can improve the following stats::
 + Efficiency of Resource Converters
 + Deployment-speed for Parachutes
 + Maximum internal- and skin-temperature
++ Fuel pressure (capacity of fuel tanks)
+
+Please note that this mod is not 100% compatible with other mods which modify parts at runtime (eg TweakScale or FuelSwitch).
 
 If you have any problems with this mod or would like to suggest an improvement, please go to the official [forum thread](http://forum.kerbalspaceprogram.com/index.php?/topic/128204-105-kerbal-research-development/) or open a new ticket on [Github](https://github.com/mmoench/KRnD).
