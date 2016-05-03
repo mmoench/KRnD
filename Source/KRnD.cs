@@ -455,52 +455,58 @@ namespace KRnD
                             if (info.moduleName.ToLower() == "engine")
                             {
                                 List<ModuleEngines> engines = KRnD.getEngineModules(part.partPrefab);
-                                ModuleEngines engine = engines[engineModuleNumber];
-                                info.info = engine.GetInfo();
-                                info.primaryInfo = engine.GetPrimaryField();
-                                engineModuleNumber++;
+                                if (engines != null && engines.Count > 0)
+                                {
+                                    ModuleEngines engine = engines[engineModuleNumber];
+                                    info.info = engine.GetInfo();
+                                    info.primaryInfo = engine.GetPrimaryField();
+                                    engineModuleNumber++;
+                                }
                             }
                             else if (info.moduleName.ToLower() == "rcs")
                             {
                                 ModuleRCS rcs = KRnD.getRcsModule(part.partPrefab);
-                                info.info = rcs.GetInfo();
+                                if (rcs) info.info = rcs.GetInfo();
                             }
                             else if (info.moduleName.ToLower() == "reaction wheel")
                             {
                                 ModuleReactionWheel reactionWheel = KRnD.getReactionWheelModule(part.partPrefab);
-                                info.info = reactionWheel.GetInfo();
+                                if (reactionWheel) info.info = reactionWheel.GetInfo();
                             }
                             else if (info.moduleName.ToLower() == "deployable solar panel")
                             {
                                 ModuleDeployableSolarPanel solarPanel = KRnD.getSolarPanelModule(part.partPrefab);
-                                info.info = KRnD.getSolarPanelInfo(solarPanel);
+                                if (solarPanel) info.info = KRnD.getSolarPanelInfo(solarPanel);
                             }
                             else if (info.moduleName.ToLower() == "landing leg")
                             {
                                 ModuleWheelBase landingLeg = KRnD.getLandingLegModule(part.partPrefab);
-                                info.info = landingLeg.GetInfo();
+                                if (landingLeg) info.info = landingLeg.GetInfo();
                             }
                             else if (info.moduleName.ToLower() == "generator")
                             {
                                 ModuleGenerator generator = KRnD.getGeneratorModule(part.partPrefab);
-                                info.info = generator.GetInfo();
+                                if (generator) info.info = generator.GetInfo();
                             }
                             else if (info.moduleName.ToLower() == "resource converter")
                             {
                                 List<ModuleResourceConverter> converterList = KRnD.getConverterModules(part.partPrefab);
-                                ModuleResourceConverter converter = converterList[converterModuleNumber];
-                                info.info = converter.GetInfo();
-                                converterModuleNumber++;
+                                if (converterList != null && converterList.Count > 0)
+                                {
+                                    ModuleResourceConverter converter = converterList[converterModuleNumber];
+                                    info.info = converter.GetInfo();
+                                    converterModuleNumber++;
+                                }
                             }
                             else if (info.moduleName.ToLower() == "parachute")
                             {
                                 ModuleParachute parachute = KRnD.getParachuteModule(part.partPrefab);
-                                info.info = parachute.GetInfo();
+                                if (parachute) info.info = parachute.GetInfo();
                             }
                             else if (info.moduleName.ToLower() == "custom-built fairing")
                             {
                                 ModuleProceduralFairing fairing = KRnD.getFairingModule(part.partPrefab);
-                                info.info = fairing.GetInfo();
+                                if (fairing) info.info = fairing.GetInfo();
                             }
                         }
 
@@ -811,7 +817,7 @@ namespace KRnD
 
                 // Fuel Capacity:
                 List<PartResource> fuelResources = KRnD.getFuelResources(part);
-                if (fuelResources != null)
+                if (fuelResources != null && originalStats.fuelCapacities != null)
                 {
                     rndModule.fuelCapacity_upgrades = upgradesToApply.fuelCapacity;
                     double improvementFactor = (1 + KRnD.calculateImprovementFactor(rndModule.fuelCapacity_improvement, rndModule.fuelCapacity_improvementScale, upgradesToApply.fuelCapacity));
@@ -838,7 +844,7 @@ namespace KRnD
             }
             catch (Exception e)
             {
-                Debug.LogError("[KRnD] updatePart(): " + e.ToString());
+                Debug.LogError("[KRnD] updatePart("+part.name.ToString()+"): " + e.ToString());
             }
         }
 
