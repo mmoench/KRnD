@@ -650,7 +650,7 @@ namespace KRnD
 
                     // Scale science cost with original mass:
                     PartStats originalStats;
-                    if (!KRnD.originalStats.TryGetValue(part.name, out originalStats)) throw new Exception("no origional-stats for part '" + part.name + "'");
+                    if (!KRnD.originalStats.TryGetValue(part.name, out originalStats)) throw new Exception("no original-stats for part '" + part.name + "'");
                     float scaleReferenceFactor = 1;
                     if (rndModule.dryMass_costScaleReference > 0) scaleReferenceFactor = originalStats.mass / rndModule.dryMass_costScaleReference;
                     int scaledCost = (int) Math.Round(rndModule.dryMass_scienceCost * scaleReferenceFactor);

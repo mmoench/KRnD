@@ -4,6 +4,7 @@ using System.Text;
 using UnityEngine;
 using KSP.IO;
 using KSP;
+using System.IO;
 
 using System.Reflection;
 using System.Collections;
@@ -265,9 +266,17 @@ namespace KRnD
         public static Dictionary<string, PartStats> originalStats = null;
         public static Dictionary<string, KRnDUpgrade> upgrades = new Dictionary<string, KRnDUpgrade>();
         public static List<string> fuelResources = null;
+        public static List<string> blacklistedParts = null;
 
         public static KRnDModule getKRnDModule(Part part)
         {
+            // If this is a blacklisted part, don't touch it, even if it should have an RnD-Module. We do it like
+            // this because using module-manager-magic to prevent RnD from getting installed with other, incompatible
+            // modules from other mods depends on the order in which module-manager applies the patches; this way
+            // we can avoid these problems. It means though that parts might have the RnD-Module, wich isn't used though.
+            if (KRnD.blacklistedParts.Contains(part.name)) return null;
+
+            // Check if this part has the RnD-Module and return it:
             foreach (PartModule partModule in part.Modules)
             {
                 if (partModule.moduleName == "KRnDModule") return (KRnDModule)partModule;
@@ -615,7 +624,7 @@ namespace KRnD
 
                 // Get the original part-stats:
                 PartStats originalStats;
-                if (!KRnD.originalStats.TryGetValue(partName, out originalStats)) throw new Exception("no origional-stats for part '" + partName + "'");
+                if (!KRnD.originalStats.TryGetValue(partName, out originalStats)) throw new Exception("no original-stats for part '" + partName + "'");
 
                 KRnDUpgrade latestModel;
                 if (!KRnD.upgrades.TryGetValue(partName, out latestModel)) latestModel = null;
@@ -919,6 +928,25 @@ namespace KRnD
             }
         }
 
+        public List<string> getBlacklistedModules()
+        {
+            List<string> blacklistedModules = new List<string>();
+            try
+            {
+                ConfigNode node = ConfigNode.Load(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "/blacklist.cfg");
+
+                foreach (string blacklistedModule in node.GetValues("BLACKLISTED_MODULE"))
+                {
+                    if (!blacklistedModules.Contains(blacklistedModule)) blacklistedModules.Add(blacklistedModule);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[KRnD] getBlacklistedModules(): " + e.ToString());
+            }
+            return blacklistedModules;
+        }
+
         // Is called when this Addon is first loaded to initializes all values (eg registration of event-handlers and creation
         // of original-stats library).
         public void Awake()
@@ -957,7 +985,39 @@ namespace KRnD
                     Debug.Log("[KRnD] found " + KRnD.fuelResources.Count.ToString() + " propellants: " + listString);
                 }
 
-                // Create a backup of all unmodivied parts before we update them. We will later use these backup-parts
+                // Create a list of blacklisted parts (parts with known incompatible modules of other mods):
+                if (KRnD.blacklistedParts == null)
+                {
+                    KRnD.blacklistedParts = new List<string>();
+                    List<string> blacklistedModules = getBlacklistedModules();
+
+                    foreach (AvailablePart aPart in PartLoader.Instance.parts)
+                    {
+                        Part part = aPart.partPrefab;
+                        Boolean skip = false;
+                        string blacklistedModule = "N/A";
+
+                        foreach (PartModule partModule in part.Modules)
+                        {
+                            if (blacklistedModules.Contains(partModule.moduleName))
+                            {
+                                blacklistedModule = partModule.moduleName;
+                                skip = true;
+                                break;
+                            }
+                        }
+                        if (skip)
+                        {
+                            Debug.Log("[KRnD] blacklisting part '" + part.name.ToString() + "' (has blacklisted module '" + blacklistedModule.ToString() + "')");
+                            if (!KRnD.blacklistedParts.Contains(part.name)) KRnD.blacklistedParts.Add(part.name);
+                            continue;
+                        }
+                    }
+
+                    Debug.Log("[KRnD] blacklisted " + KRnD.blacklistedParts.Count.ToString() + " parts, which contained one of " + blacklistedModules.Count.ToString() + " blacklisted modules");
+                }
+
+                // Create a backup of all unmodified parts before we update them. We will later use these backup-parts
                 // for all calculations of upgraded stats.
                 if (KRnD.originalStats == null)
                 {
