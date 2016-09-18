@@ -15,6 +15,10 @@ namespace KRnD
         [KSPField(guiActive = true, guiName = "R&D", guiUnits = "", guiFormat = "", isPersistant = false)]
         public String moduleVersion;
 
+        // Flag, which can be set by other mods to apply latest upgrades on load:
+        [KSPField(isPersistant = true)]
+        public int upgradeToLatest = 0;
+
         // ISP Vac
         [KSPField(isPersistant = true)]
         public int ispVac_upgrades = 0;

@@ -274,7 +274,7 @@ namespace KRnD
             // this because using module-manager-magic to prevent RnD from getting installed with other, incompatible
             // modules from other mods depends on the order in which module-manager applies the patches; this way
             // we can avoid these problems. It means though that parts might have the RnD-Module, wich isn't used though.
-            if (KRnD.blacklistedParts.Contains(part.name)) return null;
+            if (KRnD.blacklistedParts.Contains(KRnD.sanatizePartName(part.name))) return null;
 
             // Check if this part has the RnD-Module and return it:
             foreach (PartModule partModule in part.Modules)
@@ -577,7 +577,7 @@ namespace KRnD
             KRnDUpgrade upgradesToApply;
             if (updateToLatestModel)
             {
-                if (KRnD.upgrades.TryGetValue(part.name, out upgradesToApply))
+                if (KRnD.upgrades.TryGetValue(KRnD.sanatizePartName(part.name), out upgradesToApply))
                 {
                     // Apply upgrades from global list:
                     KRnD.updatePart(part, upgradesToApply);
@@ -607,6 +607,13 @@ namespace KRnD
             }
         }
 
+        // Sometimes the name of the root-part of a vessel is extended by the vessel-name like "Mk1Pod (X-Bird)", this function can be used
+        // as wrapper to always return the real name:
+        public static string sanatizePartName(string partName)
+        {
+            return Regex.Replace(partName, @" \(.*\)$", "");
+        }
+
         // Updates the given part with all upgrades provided in "upgradesToApply".
         public static void updatePart(Part part, KRnDUpgrade upgradesToApply)
         {
@@ -618,9 +625,8 @@ namespace KRnD
                 if (KRnD.upgrades == null) throw new Exception("upgrades-dictionary missing");
                 if (KRnD.originalStats == null) throw new Exception("original-stats-dictionary missing");
 
-                // Get the part-name (sometimes the name of the root-part of a vessel is extended by the vessel-name like "Mk1Pod (X-Bird)"):
-                String partName = part.name;
-                partName = Regex.Replace(partName, @" \(.*\)$", "");
+                // Get the part-name ("):
+                String partName = KRnD.sanatizePartName(part.name);
 
                 // Get the original part-stats:
                 PartStats originalStats;
@@ -872,20 +878,19 @@ namespace KRnD
                 foreach (Part part in vessel.parts)
                 {
                     // We only have to update parts which have the RnD-Module:
-                    bool hasRnd = false;
-                    foreach (PartModule partModule in part.Modules)
-                    {
-                        if (partModule.moduleName == "KRnDModule")
-                        {
-                            hasRnd = true;
-                            break;
-                        }
-                    }
-                    if (!hasRnd) continue;
+                    KRnDModule rndModule = KRnD.getKRnDModule(part);
+                    if (rndModule == null) continue;
 
                     if (vessel.situation == Vessel.Situations.PRELAUNCH)
                     {
                         // Update the part with the latest model while on the launchpad:
+                        KRnD.updatePart(part, true);
+                    }
+                    else if (rndModule.upgradeToLatest > 0)
+                    {
+                        // Flagged by another mod (eg KSTS) to get updated to the latest model (once):
+                        Debug.Log("[KRnD] part '"+ KRnD.sanatizePartName(part.name) + "' of '"+ vessel.vesselName + "' was flagged to be updated to the latest model");
+                        rndModule.upgradeToLatest = 0;
                         KRnD.updatePart(part, true);
                     }
                     else
