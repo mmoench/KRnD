@@ -384,8 +384,8 @@ namespace KRnD
                 // Basic stats:
                 info = "<color=#FFFFFF><b>Dry Mass:</b> "+ part.mass.ToString("0.#### t") +"\n";
                 info += "<b>Max Temp.:</b> " + part.maxTemp.ToString("0.#") + "/" + part.skinMaxTemp.ToString("0.#") + " °K\n";
-                if (landingLegModule) info += "<b>Crash Tolerance:</b> " + part.crashTolerance.ToString("0.#### m/s") + "\n";
-                if (electricChargeResource) info += "<b>Electric Charge:</b> " + electricChargeResource.maxAmount.ToString() + "\n";
+                if (landingLegModule != null) info += "<b>Crash Tolerance:</b> " + part.crashTolerance.ToString("0.#### m/s") + "\n";
+                if (electricChargeResource != null) info += "<b>Electric Charge:</b> " + electricChargeResource.maxAmount.ToString() + "\n";
                 
                 // Fuels:
                 if (fuelResources != null)
@@ -496,7 +496,7 @@ namespace KRnD
                 List<PartResource> fuelResources = null;
                 if (selectedPart != null)
                 {
-                    foreach (AvailablePart aPart in PartLoader.Instance.parts)
+                    foreach (AvailablePart aPart in PartLoader.LoadedPartsList)
                     {
                         if (aPart.partPrefab.name == selectedPart.name)
                         {
@@ -570,19 +570,19 @@ namespace KRnD
                     options.Add("ISP Atm");
                     options.Add("Fuel Flow");
                 }
-                if (reactionWheelModule)
+                if (reactionWheelModule != null)
                 {
                     options.Add("Torque");
                 }
-                if (solarPanelModule)
+                if (solarPanelModule != null)
                 {
                     options.Add("Charge Rate");
                 }
-                if (landingLegModule)
+                if (landingLegModule != null)
                 {
                     options.Add("Crash Tolerance");
                 }
-                if (electricChargeResource)
+                if (electricChargeResource != null)
                 {
                     options.Add("Battery");
                 }

@@ -8,7 +8,6 @@
 
 ## Requirements
 
-+ KSP 1.1
 + [Module Manager](https://github.com/sarbian/ModuleManager)
 
 ## Status 

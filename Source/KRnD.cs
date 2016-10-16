@@ -202,16 +202,16 @@ namespace KRnD
             }
 
             PartResource electricCharge = KRnD.getChargeResource(part);
-            if (electricCharge)
+            if (electricCharge != null)
             {
                 this.batteryCharge = electricCharge.maxAmount;
             }
 
             ModuleGenerator generator = KRnD.getGeneratorModule(part);
-            if (generator)
+            if (generator != null)
             {
                 generatorEfficiency = new Dictionary<String, double>();
-                foreach (ModuleResource outputResource in generator.outputList)
+                foreach (ModuleResource outputResource in generator.resHandler.outputResources)
                 {
                     generatorEfficiency.Add(outputResource.name, outputResource.rate);
                 }
@@ -446,7 +446,7 @@ namespace KRnD
             try
             {
                 if (KRnD.upgrades == null) throw new Exception("upgrades-dictionary missing");
-                foreach (AvailablePart part in PartLoader.Instance.parts)
+                foreach (AvailablePart part in PartLoader.LoadedPartsList)
                 {
                     try
                     {
@@ -524,7 +524,7 @@ namespace KRnD
                         foreach (AvailablePart.ResourceInfo info in part.resourceInfos)
                         {
                             // The Resource-Names are not always formated the same way, eg "Electric Charge" vs "ElectricCharge", so we do some reformating.
-                            if (electricCharge && info.resourceName.Replace(" ", "").ToLower() == electricCharge.resourceName.Replace(" ", "").ToLower())
+                            if (electricCharge != null && info.resourceName.Replace(" ", "").ToLower() == electricCharge.resourceName.Replace(" ", "").ToLower())
                             {
                                 info.info = electricCharge.GetInfo();
                                 info.primaryInfo = "<b>" + info.resourceName + ":</b> " + electricCharge.maxAmount.ToString();
@@ -759,7 +759,7 @@ namespace KRnD
 
                 // Battery Charge:
                 PartResource electricCharge = KRnD.getChargeResource(part);
-                if (electricCharge)
+                if (electricCharge != null)
                 {
                     rndModule.batteryCharge_upgrades = upgradesToApply.batteryCharge;
                     double batteryCharge = originalStats.batteryCharge * (1 + KRnD.calculateImprovementFactor(rndModule.batteryCharge_improvement, rndModule.batteryCharge_improvementScale, upgradesToApply.batteryCharge));
@@ -782,7 +782,7 @@ namespace KRnD
                 {
                     rndModule.generatorEfficiency_upgrades = upgradesToApply.generatorEfficiency;
 
-                    foreach (ModuleResource outputResource in generator.outputList)
+                    foreach (ModuleResource outputResource in generator.resHandler.outputResources)
                     {
                         double originalRate;
                         if (!originalStats.generatorEfficiency.TryGetValue(outputResource.name, out originalRate)) continue;
@@ -804,11 +804,14 @@ namespace KRnD
                         if (!originalStats.converterEfficiency.TryGetValue(converter.ConverterName, out origiginalOutputResources)) continue;
 
                         rndModule.converterEfficiency_upgrades = upgradesToApply.converterEfficiency;
-                        foreach (ResourceRatio resourceRatio in converter.outputList)
+                        // Since KSP 1.2 this can't be done in a foreach anymore, we have to read and write back the entire ResourceRatio-Object:
+                        for (int i=0; i< converter.outputList.Count; i++)
                         {
+                            ResourceRatio resourceRatio = converter.outputList[i];
                             double originalRatio;
                             if (!origiginalOutputResources.TryGetValue(resourceRatio.ResourceName, out originalRatio)) continue;
                             resourceRatio.Ratio = (float)(originalRatio * (1 + KRnD.calculateImprovementFactor(rndModule.converterEfficiency_improvement, rndModule.converterEfficiency_improvementScale, upgradesToApply.converterEfficiency)));
+                            converter.outputList[i] = resourceRatio;
                         }
                     }
                 }
@@ -964,7 +967,7 @@ namespace KRnD
                     KRnD.fuelResources = new List<string>();
                     KRnD.fuelResources.Add("MonoPropellant"); // Always use MonoPropellant as fuel (RCS-Thrusters don't have engine modules and are not found with the code below)
 
-                    foreach (AvailablePart aPart in PartLoader.Instance.parts)
+                    foreach (AvailablePart aPart in PartLoader.LoadedPartsList)
                     {
                         Part part = aPart.partPrefab;
                         List<ModuleEngines> engineModules = KRnD.getEngineModules(part);
@@ -996,7 +999,7 @@ namespace KRnD
                     KRnD.blacklistedParts = new List<string>();
                     List<string> blacklistedModules = getBlacklistedModules();
 
-                    foreach (AvailablePart aPart in PartLoader.Instance.parts)
+                    foreach (AvailablePart aPart in PartLoader.LoadedPartsList)
                     {
                         Part part = aPart.partPrefab;
                         Boolean skip = false;
@@ -1027,7 +1030,7 @@ namespace KRnD
                 if (KRnD.originalStats == null)
                 {
                     KRnD.originalStats = new Dictionary<string, PartStats>();
-                    foreach (AvailablePart aPart in PartLoader.Instance.parts)
+                    foreach (AvailablePart aPart in PartLoader.LoadedPartsList)
                     {
                         Part part = aPart.partPrefab;
 
