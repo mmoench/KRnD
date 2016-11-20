@@ -5,7 +5,7 @@
     "name"         : "Kerbal Research And Development",
     "abstract"     : "This mod allows the player to invest science points to improve the stats of parts such as the mass or engine-efficiency.",
     "license"      : "CC-BY-NC-SA-4.0",
-    "ksp_version"  : "1.2.0",
+    "ksp_version"  : "1.2.1",
     "author"       : "mm",
     "x_netkan_github": {
         "use_source_archive": true
