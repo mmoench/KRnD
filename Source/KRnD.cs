@@ -955,6 +955,25 @@ namespace KRnD
             return blacklistedModules;
         }
 
+        public List<string> getBlacklistedParts()
+        {
+            List<string> blacklistedParts = new List<string>();
+            try
+            {
+                ConfigNode node = ConfigNode.Load(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) + "/blacklist.cfg");
+
+                foreach (string blacklistedPart in node.GetValues("BLACKLISTED_PART"))
+                {
+                    if (!blacklistedParts.Contains(blacklistedPart)) blacklistedParts.Add(blacklistedPart);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError("[KRnD] getBlacklistedParts(): " + e.ToString());
+            }
+            return blacklistedParts;
+        }
+
         // Is called when this Addon is first loaded to initializes all values (eg registration of event-handlers and creation
         // of original-stats library).
         public void Awake()
@@ -996,7 +1015,7 @@ namespace KRnD
                 // Create a list of blacklisted parts (parts with known incompatible modules of other mods):
                 if (KRnD.blacklistedParts == null)
                 {
-                    KRnD.blacklistedParts = new List<string>();
+                    KRnD.blacklistedParts = getBlacklistedParts();
                     List<string> blacklistedModules = getBlacklistedModules();
 
                     foreach (AvailablePart aPart in PartLoader.LoadedPartsList)

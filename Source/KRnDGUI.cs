@@ -14,6 +14,7 @@ namespace KRnD
     [KSPAddon(KSPAddon.Startup.EditorAny, false)]
     public class KRnDGUI : UnityEngine.MonoBehaviour
     {
+        // TODO: The Application-Button shows up during the flight scene ...
         private static ApplicationLauncherButton button = null;
         public static Rect windowPosition = new Rect(300, 60, 450, 400);
         private static GUIStyle windowStyle = new GUIStyle(HighLogic.Skin.window) { fixedWidth = 500f, fixedHeight = 300f };
@@ -35,7 +36,7 @@ namespace KRnD
             if (texture == null)
             {
                 texture = new Texture2D(36, 36, TextureFormat.RGBA32, false);
-                var textureFile = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "R&D_icon.truecolor");
+                var textureFile = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location), "R&D_icon.png");
                 texture.LoadImage(File.ReadAllBytes(textureFile));
             }
 
