@@ -303,7 +303,7 @@ namespace KRnD
         {
             foreach (PartModule partModule in part.Modules)
             {
-                if (partModule.moduleName == "ModuleRCS") return (ModuleRCS)partModule;
+                if (partModule.moduleName == "ModuleRCS" || partModule.moduleName == "ModuleRCSFX") return (ModuleRCS)partModule;
             }
             return null;
         }
