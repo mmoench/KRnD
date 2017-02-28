@@ -377,6 +377,7 @@ namespace KRnD
                 ModuleWheelBase landingLegModule = KRnD.getLandingLegModule(part);
                 PartResource electricChargeResource = KRnD.getChargeResource(part);
                 ModuleGenerator generatorModule = KRnD.getGeneratorModule(part);
+                PartModule fissionGenerator = KRnD.getFissionGeneratorModule(part);
                 List<ModuleResourceConverter> converterModules = KRnD.getConverterModules(part);
                 ModuleParachute parachuteModule = KRnD.getParachuteModule(part);
                 ModuleProceduralFairing fairingModule = KRnD.getFairingModule(part);
@@ -416,6 +417,7 @@ namespace KRnD
                 if (reactionWheelModule) info += "<color=#99FF00><b>Reaction Wheel:</b></color>\n" + reactionWheelModule.GetInfo();
                 if (solarPanelModule) info += "<color=#99FF00><b>Solar Panel:</b></color>\n" + KRnD.getSolarPanelInfo(solarPanelModule);
                 if (generatorModule) info += "<color=#99FF00><b>Generator:</b></color>\n" + generatorModule.GetInfo();
+                if (fissionGenerator) info += "<color=#99FF00><b>Fission-Generator:</b></color>\n" + fissionGenerator.GetInfo();
                 if (converterModules != null)
                 {
                     foreach (ModuleResourceConverter converterModule in converterModules)
@@ -492,6 +494,7 @@ namespace KRnD
                 ModuleWheelBase landingLegModule = null;
                 PartResource electricChargeResource = null;
                 ModuleGenerator generatorModule = null;
+                PartModule fissionGenerator = null;
                 List<ModuleResourceConverter> converterModules = null;
                 ModuleParachute parachuteModule = null;
                 List<PartResource> fuelResources = null;
@@ -516,6 +519,7 @@ namespace KRnD
                         landingLegModule = KRnD.getLandingLegModule(part);
                         electricChargeResource = KRnD.getChargeResource(part);
                         generatorModule = KRnD.getGeneratorModule(part);
+                        fissionGenerator = KRnD.getFissionGeneratorModule(part);
                         converterModules = KRnD.getConverterModules(part);
                         parachuteModule = KRnD.getParachuteModule(part);
                         fuelResources = KRnD.getFuelResources(part);
@@ -591,7 +595,7 @@ namespace KRnD
                 {
                     options.Add("Fuel Pressure");
                 }
-                if (generatorModule)
+                if (generatorModule || fissionGenerator)
                 {
                     options.Add("Generator");
                 }

@@ -140,6 +140,7 @@ namespace KRnD
         public float fairingAreaMass = 0;
         public Dictionary<String, double> fuelCapacities = null; // Resource-Name, capacity
         public double fuelCapacitiesSum = 0; // Sum of all fuel capacities
+        public double fissionPowerGeneration = 0; // From FissionGenerator
 
         public PartStats(Part part)
         {
@@ -217,6 +218,12 @@ namespace KRnD
                 }
             }
 
+            PartModule fissionGenerator = KRnD.getFissionGeneratorModule(part);
+            if (fissionGenerator != null)
+            {
+                fissionPowerGeneration = KRnD.getGenericModuleValue(fissionGenerator, "PowerGeneration");
+            }
+
             // There might be different converter-modules in the same part with different names (eg for Fuel, Monopropellant, etc):
             List<ModuleResourceConverter> converterList = KRnD.getConverterModules(part);
             if (converterList != null)
@@ -267,6 +274,43 @@ namespace KRnD
         public static Dictionary<string, KRnDUpgrade> upgrades = new Dictionary<string, KRnDUpgrade>();
         public static List<string> fuelResources = null;
         public static List<string> blacklistedParts = null;
+
+        // Helper for accessing values in third party modules:
+        public static double getGenericModuleValue(PartModule module, String fieldName)
+        {
+            Type type = module.GetType();
+            foreach (FieldInfo info in type.GetFields())
+            {
+                if (info.Name == fieldName) return Convert.ToDouble(info.GetValue(module));
+            }
+            throw new Exception("field " + fieldName + " not found in module " + module.moduleName);
+        }
+
+        // Helper for setting values in third party modules:
+        public static void setGenericModuleValue(PartModule module, String fieldName, double value)
+        {
+            Type type = module.GetType();
+            foreach (FieldInfo info in type.GetFields())
+            {
+                if (info.Name == fieldName)
+                {
+                    info.SetValue(module, Convert.ChangeType(value, info.FieldType));
+                    return;
+                }
+            }
+            throw new Exception("field " + fieldName + " not found in module " + module.moduleName);
+        }
+
+        // Checks if the given, generic part-module has a field with the given name:
+        public static bool hasGenericModuleField(PartModule module, String fieldName)
+        {
+            Type type = module.GetType();
+            foreach (FieldInfo info in type.GetFields())
+            {
+                if (info.Name == fieldName) return true;
+            }
+            return false;
+        }
 
         public static KRnDModule getKRnDModule(Part part)
         {
@@ -368,6 +412,16 @@ namespace KRnD
             foreach (PartModule partModule in part.Modules)
             {
                 if (partModule.moduleName == "ModuleGenerator") return (ModuleGenerator)partModule;
+            }
+            return null;
+        }
+
+        public static PartModule getFissionGeneratorModule(Part part)
+        {
+            foreach (PartModule partModule in part.Modules)
+            {
+                // We are only interested in "FissionGenerator" with the tunable attribute "PowerGeneration":
+                if (partModule.moduleName == "FissionGenerator" && KRnD.hasGenericModuleField(partModule, "PowerGeneration")) return partModule;
             }
             return null;
         }
@@ -491,6 +545,11 @@ namespace KRnD
                             {
                                 ModuleWheelBase landingLeg = KRnD.getLandingLegModule(part.partPrefab);
                                 if (landingLeg) info.info = landingLeg.GetInfo();
+                            }
+                            else if (info.moduleName.ToLower() == "fission generator")
+                            {
+                                PartModule fissionGenerator = KRnD.getFissionGeneratorModule(part.partPrefab);
+                                if (fissionGenerator) info.info = fissionGenerator.GetInfo();
                             }
                             else if (info.moduleName.ToLower() == "generator")
                             {
@@ -776,17 +835,27 @@ namespace KRnD
                     rndModule.batteryCharge_upgrades = 0;
                 }
 
-                // Generator Efficiency:
+                // Generator & Fission-Generator Efficiency:
                 ModuleGenerator generator = KRnD.getGeneratorModule(part);
-                if (generator)
+                PartModule fissionGenerator = KRnD.getFissionGeneratorModule(part);
+                if (generator || fissionGenerator)
                 {
                     rndModule.generatorEfficiency_upgrades = upgradesToApply.generatorEfficiency;
 
-                    foreach (ModuleResource outputResource in generator.resHandler.outputResources)
+                    if (generator)
                     {
-                        double originalRate;
-                        if (!originalStats.generatorEfficiency.TryGetValue(outputResource.name, out originalRate)) continue;
-                        outputResource.rate = (float) (originalRate * (1 + KRnD.calculateImprovementFactor(rndModule.generatorEfficiency_improvement, rndModule.generatorEfficiency_improvementScale, upgradesToApply.generatorEfficiency)));
+                        foreach (ModuleResource outputResource in generator.resHandler.outputResources)
+                        {
+                            double originalRate;
+                            if (!originalStats.generatorEfficiency.TryGetValue(outputResource.name, out originalRate)) continue;
+                            outputResource.rate = (float)(originalRate * (1 + KRnD.calculateImprovementFactor(rndModule.generatorEfficiency_improvement, rndModule.generatorEfficiency_improvementScale, upgradesToApply.generatorEfficiency)));
+                        }
+                    }
+                    
+                    if (fissionGenerator)
+                    {
+                        double powerGeneration = (double)(originalStats.fissionPowerGeneration * (1 + KRnD.calculateImprovementFactor(rndModule.generatorEfficiency_improvement, rndModule.generatorEfficiency_improvementScale, upgradesToApply.generatorEfficiency)));
+                        KRnD.setGenericModuleValue(fissionGenerator, "PowerGeneration", powerGeneration);
                     }
                 }
                 else
